@@ -1,0 +1,41 @@
+name: Audit
+
+# Weekly too: an advisory published against an unchanged lockfile still fails a run
+on:
+  push:
+    branches: [main]
+    paths: ["Cargo.lock", "package-lock.json", ".github/workflows/audit.yml"]
+  pull_request:
+    paths: ["Cargo.lock", "package-lock.json", ".github/workflows/audit.yml"]
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cargo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+
+      # unmaintained and unsound warnings are reported but only vulnerabilities fail
+      - run: cargo audit
+
+  npm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      # reads package-lock.json alone; nothing is installed
+      - run: npm audit --audit-level=moderate

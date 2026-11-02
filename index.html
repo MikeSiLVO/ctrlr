@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ctrl+R</title>
+    <!-- A style element, not style attributes: Tauri nonces this one, and a
+         nonce in style-src makes the CSP ignore unsafe-inline, which would
+         otherwise leave the boot screen unstyled -->
+    <style>
+      body{background:#1e293b}
+      #boot{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:12px;color:#94a3b8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:13px}
+      #boot i{width:24px;height:24px;border:2px solid #475569;border-top-color:#38bdf8;border-radius:50%;animation:spin .8s linear infinite}
+      @keyframes spin{to{transform:rotate(360deg)}}
+    </style>
+  </head>
+  <body>
+    <script>
+      // Apply saved theme before CSS loads to prevent white flash
+      var t=localStorage.getItem("ctrlr:theme");
+      if(t)document.documentElement.setAttribute("data-theme",t);
+      var bg={"light":"#f1f5f9","midnight":"#0a0a0a","nord":"#2e3440","dracula":"#282a36"};
+      if(bg[t])document.body.style.background=bg[t];
+    </script>
+    <div id="root">
+      <div id="boot">
+        <i></i>
+        Connecting...
+      </div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

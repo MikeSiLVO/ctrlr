@@ -1,0 +1,50 @@
+name: Frontend
+
+on:
+  push:
+    branches: [main]
+    paths: ["src/**", "index.html", "package.json", "package-lock.json", "tsconfig.json", "vite.config.ts", ".github/workflows/checks-frontend.yml"]
+  pull_request:
+    paths: ["src/**", "index.html", "package.json", "package-lock.json", "tsconfig.json", "vite.config.ts", ".github/workflows/checks-frontend.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: frontend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      # not npm ci: optional native deps differ per platform and libc, and npm ci rejects the gaps
+      - run: npm install --no-audit --no-fund
+      - run: npx tsc --noEmit
+      - run: npm run build
+
+      # every locale file must carry the same key set
+      - name: Check locale parity
+        run: |
+          python3 - <<'EOF'
+          import json, glob, sys
+          def keys(d, p=""):
+              out = set()
+              for k, v in d.items():
+                  n = f"{p}.{k}" if p else k
+                  out |= keys(v, n) if isinstance(v, dict) else {n}
+              return out
+          base = keys(json.load(open("src/locales/en.json")))
+          bad = False
+          for f in sorted(glob.glob("src/locales/*.json")):
+              k = keys(json.load(open(f)))
+              if k != base:
+                  bad = True
+                  print(f"{f}: missing {sorted(base - k)} extra {sorted(k - base)}")
+          sys.exit(1 if bad else 0)
+          EOF

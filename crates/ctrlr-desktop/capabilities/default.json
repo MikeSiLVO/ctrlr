@@ -1,0 +1,20 @@
+{
+  "identifier": "default",
+  "description": "Default capability for Ctrl+R",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "core:window:allow-set-title",
+    "core:event:default",
+    "deep-link:default",
+    "notification:default",
+    "autostart:default",
+    "dialog:allow-save",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [{ "url": "https://github.com/MikeSiLVO/ctrlr/*" }]
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "productName": "Ctrl+R",
+  "identifier": "io.github.mikesilvo.ctrlr",
+  "build": {
+    "frontendDist": "../../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "width": 1200,
+        "height": 800,
+        "title": "Ctrl+R",
+        "visible": false,
+        "focus": false,
+        "backgroundColor": "#1e293b"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis", "dmg", "deb", "appimage"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "fileAssociations": [
+      {
+        "ext": ["torrent"],
+        "name": "BitTorrent File",
+        "description": "BitTorrent torrent file",
+        "mimeType": "application/x-bittorrent",
+        "role": "Viewer"
+      }
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    }
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["magnet"]
+      }
+    }
+  }
+}

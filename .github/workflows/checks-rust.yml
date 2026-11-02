@@ -1,0 +1,44 @@
+name: Rust
+
+# a full Tauri compile is the costly job here
+on:
+  push:
+    branches: [main]
+    paths: ["crates/**", "Cargo.toml", "Cargo.lock", ".github/workflows/checks-rust.yml"]
+  pull_request:
+    paths: ["crates/**", "Cargo.toml", "Cargo.lock", ".github/workflows/checks-rust.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: rust-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust:
+    # each OS compiles code the others skip, such as the Windows-only pageant agent
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # Tauri links against webkit2gtk even for cargo check
+      - name: Install system dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      # saved on main only; a PR run's cache is scoped to its ref and never read back
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
