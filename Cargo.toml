@@ -16,8 +16,8 @@ tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
-base64 = "0.22"
-toml = "0.8"
+base64 = "0.23"
+toml = "1.1"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 urlencoding = "2"
 tauri = { version = "2", features = ["tray-icon", "image-png"] }
@@ -38,4 +38,4 @@ feed-rs = "3"
 regex = "1"
 semver = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
-rusqlite = { version = "0.40", features = ["bundled"] }
+rusqlite = { version = "0.41", features = ["bundled"] }
