@@ -19,17 +19,40 @@ pub struct TorrentMetaFile {
     pub size: i64,
 }
 
+/// Bencode byte string as text with invalid UTF-8 replaced; names and paths need not be UTF-8.
+struct LossyString(String);
+
+impl<'de> Deserialize<'de> for LossyString {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct BytesVisitor;
+        impl serde::de::Visitor<'_> for BytesVisitor {
+            type Value = LossyString;
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("a byte string")
+            }
+            fn visit_bytes<E: serde::de::Error>(self, v: &[u8]) -> Result<LossyString, E> {
+                Ok(LossyString(String::from_utf8_lossy(v).into_owned()))
+            }
+        }
+        deserializer.deserialize_bytes(BytesVisitor)
+    }
+}
+
 /// Serde view of one file entry in a multi-file info dict.
 #[derive(Deserialize)]
 struct BencodeFile {
-    path: Vec<String>,
+    path: Vec<LossyString>,
+    #[serde(rename = "path.utf-8")]
+    path_utf8: Option<Vec<LossyString>>,
     length: i64,
 }
 
 /// Serde view of the info dict.
 #[derive(Deserialize)]
 struct BencodeInfo {
-    name: String,
+    name: LossyString,
+    #[serde(rename = "name.utf-8")]
+    name_utf8: Option<LossyString>,
     #[serde(rename = "piece length")]
     piece_length: i64,
     length: Option<i64>,
@@ -57,6 +80,7 @@ pub fn parse(data: &[u8]) -> Result<TorrentMeta, String> {
         .map_err(|e| format!("invalid torrent file: {e}"))?;
 
     let info = &torrent.info;
+    let name = info.name_utf8.as_ref().unwrap_or(&info.name).0.clone();
     let (files, total_size) = match (&info.files, info.length) {
         (Some(file_list), _) => {
             if file_list.iter().any(|f| f.length < 0) {
@@ -67,7 +91,8 @@ pub fn parse(data: &[u8]) -> Result<TorrentMeta, String> {
             let files: Vec<TorrentMetaFile> = file_list
                 .iter()
                 .map(|f| TorrentMetaFile {
-                    path: f.path.join("/"),
+                    path: f.path_utf8.as_ref().unwrap_or(&f.path)
+                        .iter().map(|s| s.0.as_str()).collect::<Vec<_>>().join("/"),
                     size: f.length,
                 })
                 .collect();
@@ -75,7 +100,7 @@ pub fn parse(data: &[u8]) -> Result<TorrentMeta, String> {
         }
         (None, Some(length)) if length >= 0 => {
             let files = vec![TorrentMetaFile {
-                path: info.name.clone(),
+                path: name.clone(),
                 size: length,
             }];
             (files, length)
@@ -91,7 +116,7 @@ pub fn parse(data: &[u8]) -> Result<TorrentMeta, String> {
 
     Ok(TorrentMeta {
         info_hash,
-        name: info.name.clone(),
+        name,
         total_size,
         piece_length: info.piece_length,
         piece_count,
@@ -276,6 +301,19 @@ mod tests {
         assert_eq!(m.total_size, 30);
         assert_eq!(m.files[0].path, "a/b");
         assert_eq!(m.files[1].path, "c");
+    }
+
+    /// Parse names and paths with invalid UTF-8 replaced, preferring the .utf-8 keys when given.
+    #[test]
+    fn parses_names_that_are_not_utf8() {
+        let latin1 = b"d4:infod6:lengthi1e4:name5:caf\xe9!12:piece lengthi512eee";
+        assert_eq!(parse(latin1).unwrap().name, "caf\u{fffd}!");
+
+        let both = b"d4:infod6:lengthi1e4:name4:caf\xe910:name.utf-85:caf\xc3\xa912:piece lengthi512eee";
+        assert_eq!(parse(both).unwrap().name, "caf\u{e9}");
+
+        let path = b"d4:infod5:filesld6:lengthi1e4:pathl2:\xff!eee4:name1:d12:piece lengthi512eee";
+        assert_eq!(parse(path).unwrap().files[0].path, "\u{fffd}!");
     }
 
     /// Use the info dict's bytes as written for the hash; outer keys change nothing.
