@@ -171,20 +171,20 @@ pub(crate) fn conn_desc(conn: &ConnectionConfig) -> String {
     }
 }
 
-/// Connect to a profile as the live connection, dropping the old one and any launch retry first.
+/// Connect to a profile as the live connection, ending any launch retry; old one ends on success.
 async fn connect_and_store(
     state: &AppState,
     name: &str,
     conn: &ConnectionConfig,
 ) -> Result<(), String> {
     *state.launch.lock().await = None;
-    if let Some(prev) = teardown_connection(state).await {
-        state.activity_log.info("connection", format!("Disconnected from profile '{prev}'"));
-    }
-
     let (client, tunnel) = config::connect_with_config(name, conn)
         .await
         .map_err(|e| e.to_string())?;
+
+    if let Some(prev) = teardown_connection(state).await {
+        state.activity_log.info("connection", format!("Disconnected from profile '{prev}'"));
+    }
     store_connection(state, name, conn, client, tunnel).await;
     Ok(())
 }
@@ -433,7 +433,7 @@ pub async fn rename_profile(state: State<'_, AppState>, old_name: String, new_na
     Ok(())
 }
 
-/// Switch to a different profile, connecting first and then saving it as active.
+/// Switch to another profile, connecting first, then saving it as active; a failed save only warns.
 #[tauri::command]
 pub async fn switch_profile(state: State<'_, AppState>, name: String) -> Result<(), String> {
     let mut cfg = Config::load().map_err(|e| e.to_string())?;
@@ -444,5 +444,9 @@ pub async fn switch_profile(state: State<'_, AppState>, name: String) -> Result<
     connect_and_store(&state, &name, &conn).await?;
 
     cfg.active = name;
-    cfg.save()
+    // the switch already happened; an error here would leave the frontend on the old profile
+    if let Err(e) = cfg.save() {
+        state.activity_log.warn("settings", format!("Could not save the active profile: {e}"));
+    }
+    Ok(())
 }
