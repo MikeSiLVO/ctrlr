@@ -42,12 +42,10 @@ export function PropertiesDialog({ hash, onClose }: PropertiesDialogProps) {
   return (
     <DialogShell
       onClose={onClose}
-      panelClassName="rounded-lg p-4 w-[340px] flex flex-col gap-3"
+      title={t("properties.title")}
+      bodyClassName="p-4 flex flex-col gap-3"
+      panelStyle={{ width: "340px" }}
     >
-        <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
-          {t("properties.title")}
-        </span>
-
         {!props ? (
           <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
             {error || t("common.loading")}

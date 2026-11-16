@@ -114,8 +114,9 @@ export function SettingsDialog({
   return (
     <DialogShell
       onClose={onClose ?? (() => {})}
+      title={t("settings.title")}
       dismissible={!required}
-      panelClassName="rounded-lg flex"
+      bodyClassName="flex"
       // one size for every tab; resizing per tab moves the sidebar out from under the cursor
       size="panel"
     >
@@ -123,9 +124,6 @@ export function SettingsDialog({
           className="flex flex-col gap-1 p-3 shrink-0 w-[130px]"
           style={{ borderRight: "1px solid var(--border)" }}
         >
-          <span className="text-xs font-semibold px-3 pb-1" style={{ color: "var(--text-primary)" }}>
-            {t("settings.title")}
-          </span>
           <SidebarTab label={t("settings.general")} active={tab === "general"} onClick={() => setTab("general")} />
           <SidebarTab label={t("settings.remote")} active={tab === "remote"} onClick={() => setTab("remote")} />
           <SidebarTab label={t("settings.ratio")} active={tab === "ratio"} onClick={() => setTab("ratio")} />
@@ -136,18 +134,6 @@ export function SettingsDialog({
           {required && (
             <div className="mt-auto px-3 text-xs leading-tight" style={{ color: "var(--text-secondary)" }}>
               {t("settings.configureConnection")}
-            </div>
-          )}
-          {!required && onClose && (
-            <div className="mt-auto">
-              <button
-                type="button"
-                onClick={onClose}
-                className="w-full px-3 py-1.5 rounded text-xs"
-                style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
-              >
-                {t("common.close")}
-              </button>
             </div>
           )}
         </div>

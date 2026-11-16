@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
+import { CloseIcon } from "./icons";
 
 /** Overlay stack and small pieces shared by the dialogs and menus. */
 
@@ -104,26 +105,33 @@ const DIALOG_SIZES = {
   full: FIT,
 } satisfies Record<string, React.CSSProperties>;
 
-/** Centered dialog panel on a backdrop; Escape or backdrop click closes it, when allowed. */
+/** Dialog on a backdrop; a title adds a header and X; Escape or backdrop close it, when allowed. */
 export function DialogShell({
   onClose,
+  title,
+  headerExtra,
   dismissible = true,
+  closeButton = dismissible,
   zIndex = 50,
   backdropOpacity = 0.7,
   size = "compact",
   panelStyle,
-  panelClassName = "rounded-lg flex flex-col",
+  bodyClassName = "flex flex-col",
   children,
 }: {
   onClose: () => void;
+  title?: React.ReactNode;
+  headerExtra?: React.ReactNode;
   dismissible?: boolean;
+  closeButton?: boolean;
   zIndex?: number;
   backdropOpacity?: number;
   size?: keyof typeof DIALOG_SIZES;
   panelStyle?: React.CSSProperties;
-  panelClassName?: string;
+  bodyClassName?: string;
   children: React.ReactNode;
 }) {
+  const { t } = useTranslation();
   useEscapeClose(onClose, true, dismissible);
 
   return (
@@ -133,7 +141,7 @@ export function DialogShell({
       onClick={dismissible ? onClose : undefined}
     >
       <div
-        className={panelClassName}
+        className="rounded-lg flex flex-col"
         style={{
           background: "var(--bg-primary)",
           border: "1px solid var(--border)",
@@ -142,7 +150,31 @@ export function DialogShell({
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {children}
+        {title !== undefined && (
+          <div
+            className={`flex items-center gap-3 min-h-11 py-1.5 pl-4 shrink-0 ${closeButton ? "pr-2" : "pr-4"}`}
+            style={{ borderBottom: "1px solid var(--border)" }}
+          >
+            <span className="text-sm font-semibold whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
+              {title}
+            </span>
+            <div className="flex-1" />
+            {headerExtra}
+            {closeButton && (
+              <button
+                type="button"
+                onClick={onClose}
+                title={t("common.close")}
+                aria-label={t("common.close")}
+                className="flex items-center justify-center w-7 h-7 rounded shrink-0 hover:bg-[var(--bg-tertiary)]"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                <CloseIcon />
+              </button>
+            )}
+          </div>
+        )}
+        <div className={`flex-1 min-h-0 ${bodyClassName}`}>{children}</div>
       </div>
     </div>
   );

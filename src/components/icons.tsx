@@ -18,6 +18,15 @@ export function ChevronIcon({ direction, size = 12, className, style }: {
   );
 }
 
+/** Stroked X in the current text color. */
+export function CloseIcon({ size = 12 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 12 12" fill="none">
+      <path d="M3 3L9 9M9 3L3 9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 /** Filled triangle marking a sorted column's direction. */
 export function SortIcon({ asc, className }: { asc: boolean; className?: string }) {
   return (

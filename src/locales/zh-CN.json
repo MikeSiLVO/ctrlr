@@ -358,7 +358,6 @@
   "rss.feeds": "订阅源",
   "rss.rules": "规则",
   "rss.history": "历史",
-  "rss.global": "全局",
   "rss.autoDownload": "自动下载",
   "rss.feeds.add": "+ 添加",
   "rss.feeds.noFeeds": "未配置订阅源",

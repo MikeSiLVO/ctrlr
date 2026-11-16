@@ -171,20 +171,9 @@ export function HistoryDialog({ onClose }: HistoryDialogProps) {
   return (
     <DialogShell
       onClose={onClose}
-      panelClassName="rounded-lg flex flex-col"
-      size="full"
-    >
-        <div
-          className="flex items-center gap-3 px-4 py-3 shrink-0"
-          style={{ borderBottom: "1px solid var(--border)" }}
-        >
-          <span
-            className="text-sm font-semibold"
-            style={{ color: "var(--text-primary)" }}
-          >
-            {t("history.title")}
-          </span>
-          <div className="flex-1" />
+      title={t("history.title")}
+      headerExtra={
+        <>
           <input
             type="text"
             placeholder={t("common.search")}
@@ -213,19 +202,10 @@ export function HistoryDialog({ onClose }: HistoryDialogProps) {
             compact
             style={{ width: "130px" }}
           />
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-2 py-1 rounded text-xs"
-            style={{
-              background: "var(--bg-tertiary)",
-              color: "var(--text-primary)",
-            }}
-          >
-            {t("common.close")}
-          </button>
-        </div>
-
+        </>
+      }
+      size="full"
+    >
         {error && (
           <div className="px-3 py-2 text-xs" style={{ color: "var(--danger)" }}>
             {error}

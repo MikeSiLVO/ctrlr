@@ -358,7 +358,6 @@
   "rss.feeds": "Feeds",
   "rss.rules": "Reglas",
   "rss.history": "Historial",
-  "rss.global": "Global",
   "rss.autoDownload": "Descarga automática",
   "rss.feeds.add": "+ Agregar",
   "rss.feeds.noFeeds": "No hay feeds configurados",

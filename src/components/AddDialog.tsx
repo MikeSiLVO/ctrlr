@@ -463,13 +463,11 @@ export function AddDialog({ onClose, initialFiles, initialSources, existingHashe
   return (
     <DialogShell
       onClose={onClose}
+      title={torrents.length > 1 ? t("add.titleMultiple") : t("add.title")}
       backdropOpacity={0.6}
-      panelClassName="rounded-lg p-4 flex flex-col"
+      bodyClassName="p-4 flex flex-col"
       size="tall"
     >
-        <h2 className="text-sm font-semibold mb-3">
-          {torrents.length > 1 ? t("add.titleMultiple") : t("add.title")}
-        </h2>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3 min-h-0 flex-1">
           <div className="flex items-center gap-2">

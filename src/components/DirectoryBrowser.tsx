@@ -66,12 +66,11 @@ export function DirectoryBrowser({
   return (
     <DialogShell
       onClose={onCancel}
+      title={t("directory.title")}
       zIndex={60}
-      panelClassName="rounded-lg p-4 flex flex-col"
+      bodyClassName="p-4 flex flex-col"
       panelStyle={{ width: "500px", maxHeight: "70vh" }}
     >
-        <h2 className="text-sm font-semibold mb-2">{t("directory.title")}</h2>
-
         <div
           className="flex items-center gap-0.5 text-xs px-2 py-1.5 rounded mb-2 overflow-x-auto"
           style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}

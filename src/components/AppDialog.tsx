@@ -123,7 +123,6 @@ function DialogOverlay({
       onClose={handleCancel}
       zIndex={100}
       backdropOpacity={0.5}
-      panelClassName="rounded-lg"
       panelStyle={{ minWidth: "340px", maxWidth: "460px", boxShadow: "0 8px 32px rgba(0,0,0,0.4)" }}
     >
       <div className="p-5 flex flex-col gap-4" onKeyDown={handleKeyDown}>
