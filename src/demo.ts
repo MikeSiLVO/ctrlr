@@ -623,7 +623,11 @@ export function historyPage(q: HistoryQuery): TorrentHistoryPage {
       const c = x < y ? -1 : x > y ? 1 : 0;
       return (q.desc ? -c : c) || b.added_at - a.added_at;
     });
-  return { entries: rows.slice(q.page * q.page_size, (q.page + 1) * q.page_size), total: rows.length };
+  return {
+    entries: rows.slice(q.page * q.page_size, (q.page + 1) * q.page_size),
+    total: rows.length,
+    blob_total: rows.filter((e) => e.has_blob).length,
+  };
 }
 
 /** Sample .torrent files the Add dialog opens with. */

@@ -286,10 +286,11 @@ export interface HistoryQuery {
   desc: boolean;
 }
 
-/** One page of torrent history and the count of entries matching the filters. */
+/** One page of history, with counts of entries and archived .torrents matching the filters. */
 export interface TorrentHistoryPage {
   entries: TorrentHistoryEntry[];
   total: number;
+  blob_total: number;
 }
 
 /** Status buckets offered in the sidebar. */

@@ -47,11 +47,12 @@ pub struct HistoryQuery {
     pub desc: bool,
 }
 
-/// One page of history entries, with the total count matching the filters.
+/// One page of history entries, with counts of entries and archived .torrents matching the filters.
 #[derive(Debug, Clone, Serialize)]
 pub struct TorrentHistoryPage {
     pub entries: Vec<TorrentHistoryEntry>,
     pub total: i64,
+    pub blob_total: i64,
 }
 
 /// A torrent history row to insert.
@@ -177,12 +178,12 @@ impl Database {
         let dir = if query.desc { "DESC" } else { "ASC" };
 
         let conn = self.conn.lock().unwrap();
-        let count_sql = format!("{with} SELECT COUNT(*) FROM torrent_history {where_sql}");
-        let total: i64 = {
+        let count_sql = format!("{with} SELECT COUNT(*), COUNT(torrent_blob) FROM torrent_history {where_sql}");
+        let (total, blob_total): (i64, i64) = {
             let mut stmt = conn.prepare(&count_sql)
                 .map_err(|e| format!("count query failed: {e}"))?;
             let refs: Vec<&dyn rusqlite::types::ToSql> = bind_values.iter().map(|b| b.as_ref()).collect();
-            stmt.query_row(refs.as_slice(), |row| row.get(0))
+            stmt.query_row(refs.as_slice(), |row| Ok((row.get(0)?, row.get(1)?)))
                 .map_err(|e| format!("count failed: {e}"))?
         };
 
@@ -221,7 +222,7 @@ impl Database {
         .filter_map(|r| r.ok())
         .collect();
 
-        Ok(TorrentHistoryPage { entries, total })
+        Ok(TorrentHistoryPage { entries, total, blob_total })
     }
 
     /// Get the archived .torrent of one entry, None when it has none.

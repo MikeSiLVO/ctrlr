@@ -80,7 +80,7 @@ export function HistoryDialog({ onClose }: HistoryDialogProps) {
   const { t } = useTranslation();
   const sourceOptions = useSourceOptions();
   const statusOptions = useStatusOptions();
-  const [data, setData] = useState<TorrentHistoryPage>({ entries: [], total: 0 });
+  const [data, setData] = useState<TorrentHistoryPage>({ entries: [], total: 0, blob_total: 0 });
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState("");
   const [sourceFilter, setSourceFilter] = useState("");
@@ -166,7 +166,6 @@ export function HistoryDialog({ onClose }: HistoryDialogProps) {
   }
 
   const totalPages = Math.max(1, Math.ceil(data.total / PAGE_SIZE));
-  const blobCount = data.entries.filter((e) => e.has_blob).length;
 
   return (
     <DialogShell
@@ -349,7 +348,7 @@ export function HistoryDialog({ onClose }: HistoryDialogProps) {
         >
           <span>
             {t("history.entryCount", { count: data.total })}
-            {blobCount > 0 && ` \u00B7 ${blobCount} ${t("history.withTorrent")}`}
+            {data.blob_total > 0 && ` \u00B7 ${data.blob_total} ${t("history.withTorrent")}`}
           </span>
           <div className="flex-1" />
           <button
