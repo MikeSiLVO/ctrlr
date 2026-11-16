@@ -245,18 +245,18 @@ export function HistoryDialog({ onClose }: HistoryDialogProps) {
                   zIndex: 1,
                 }}
               >
-                <SortHeader label={t("history.name")} field="name" sort={sort} onSort={handleSort} width="40%" />
-                <SortHeader label={t("history.size")} field="size" sort={sort} onSort={handleSort} width="10%" right />
+                <SortHeader label={t("history.name")} field="name" sort={sort} onSort={handleSort} width="100%" />
+                <SortHeader label={t("history.size")} field="size" sort={sort} onSort={handleSort} width="1%" right />
                 <th
                   className="text-center px-3 py-2 font-medium"
-                  style={{ color: "var(--text-secondary)", width: "10%" }}
+                  style={{ color: "var(--text-secondary)", width: "1%", whiteSpace: "nowrap" }}
                 >
                   {t("history.source")}
                 </th>
-                <SortHeader label={t("history.added")} field="added" sort={sort} onSort={handleSort} width="15%" />
-                <SortHeader label={t("history.status")} field="status" sort={sort} onSort={handleSort} width="12%" />
+                <SortHeader label={t("history.added")} field="added" sort={sort} onSort={handleSort} width="1%" />
+                <SortHeader label={t("history.status")} field="status" sort={sort} onSort={handleSort} width="1%" />
                 <th
-                  className="text-center px-3 py-2 font-medium"
+                  className="text-right px-3 py-2 font-medium"
                   style={{ color: "var(--text-secondary)", width: "1%", whiteSpace: "nowrap" }}
                 >
                   {t("history.actions")}
@@ -294,24 +294,24 @@ export function HistoryDialog({ onClose }: HistoryDialogProps) {
                   </td>
                   <td
                     className="px-3 py-1.5 whitespace-nowrap"
-                    style={{ color: entry.loaded ? "var(--accent)" : "var(--text-secondary)" }}
+                    style={{ color: entry.loaded ? "var(--text-primary)" : "var(--text-secondary)" }}
                   >
                     {entry.loaded ? t("history.active") : t("history.removed")}
                   </td>
-                  <td className="px-3 py-1.5 text-center">
-                    <div className="flex items-center justify-center gap-1">
-                      {entry.has_blob && (
-                        <ActionBtn
-                          label={t("history.save")}
-                          title={t("history.exportTorrent")}
-                          onClick={() => handleExport(entry)}
-                        />
-                      )}
+                  <td className="px-3 py-1.5 text-right">
+                    <div className="flex items-center justify-end gap-1">
                       {entry.has_blob && !entry.loaded && (
                         <ActionBtn
                           label={t("history.reAdd")}
                           title={t("history.addBack")}
                           onClick={() => handleReAdd(entry)}
+                        />
+                      )}
+                      {entry.has_blob && (
+                        <ActionBtn
+                          label={t("history.save")}
+                          title={t("history.exportTorrent")}
+                          onClick={() => handleExport(entry)}
                         />
                       )}
                       <ActionBtn
@@ -396,7 +396,7 @@ function SortHeader({ label, field, sort, onSort, width, right }: {
   return (
     <th
       onClick={() => onSort(field)}
-      className="px-3 py-2 font-medium cursor-pointer select-none"
+      className="px-3 py-2 font-medium cursor-pointer select-none whitespace-nowrap"
       style={{
         color: sorted ? "var(--accent)" : "var(--text-secondary)",
         textAlign: right ? "right" : "left",
