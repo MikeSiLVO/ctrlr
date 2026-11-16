@@ -190,7 +190,6 @@
   "add.title": "Add Torrent",
   "add.titleMultiple": "Add Torrents",
   "add.browseTorrent": "Browse .torrent",
-  "add.addUrlMagnet": "Add URL / Magnet",
   "add.magnetOrUrl": "Magnet link or URL...",
   "add.duplicate": "DUPLICATE",
   "add.error": "ERROR",

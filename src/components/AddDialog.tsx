@@ -206,7 +206,6 @@ export function AddDialog({ onClose, initialFiles, initialSources, existingHashe
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showDirBrowser, setShowDirBrowser] = useState(false);
-  const [showUrlInput, setShowUrlInput] = useState(false);
   const [urlValue, setUrlValue] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -220,10 +219,7 @@ export function AddDialog({ onClose, initialFiles, initialSources, existingHashe
       files: (initialFiles ?? []).length,
     };
 
-    if (newSources.length === 0 && newFiles.length === 0) {
-      if (torrents.length === 0) setShowUrlInput(true);
-      return;
-    }
+    if (newSources.length === 0 && newFiles.length === 0) return;
 
     const added: PendingTorrent[] = [];
     for (const src of newSources) {
@@ -265,7 +261,6 @@ export function AddDialog({ onClose, initialFiles, initialSources, existingHashe
         isDuplicate: false,
       }));
       setTorrents(seeded);
-      setShowUrlInput(false);
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -355,7 +350,6 @@ export function AddDialog({ onClose, initialFiles, initialSources, existingHashe
       parseMagnet(entry.id, trimmed);
     }
     setUrlValue("");
-    setShowUrlInput(false);
   }
 
   function removeTorrent(id: string) {
@@ -397,8 +391,12 @@ export function AddDialog({ onClose, initialFiles, initialSources, existingHashe
   const allFilesSelected = selected?.files.every((f) => f.priority > 0) ?? false;
   const noFilesSelected = selected?.files.every((f) => f.priority === 0) ?? false;
 
+  const typedUrl = urlValue.trim();
   const checkedTorrents = torrents.filter((t) => !t.isDuplicate && !t.error);
-  const canSubmit = checkedTorrents.length > 0 && !checkedTorrents.some((t) =>
+  const submitTorrents = typedUrl && !torrents.some((t) => t.url === typedUrl)
+    ? [...checkedTorrents, urlTorrent(typedUrl)]
+    : checkedTorrents;
+  const canSubmit = submitTorrents.length > 0 && !submitTorrents.some((t) =>
     t.source === "file" && t.files.length > 0 && t.files.every((f) => f.priority === 0),
   );
 
@@ -409,7 +407,7 @@ export function AddDialog({ onClose, initialFiles, initialSources, existingHashe
     setLoading(true);
     setError(null);
     try {
-      for (const t of checkedTorrents) {
+      for (const t of submitTorrents) {
         if (t.source === "url" && t.url) {
           await api.addTorrent(t.url, t.directory.trim());
         } else if (t.fileData && t.meta) {
@@ -483,13 +481,32 @@ export function AddDialog({ onClose, initialFiles, initialSources, existingHashe
             >
               {t("add.browseTorrent")}
             </button>
+            <input
+              type="text"
+              value={urlValue}
+              onChange={(e) => setUrlValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") { e.preventDefault(); addUrl(urlValue); }
+                // Escape clears the field instead of closing the dialog
+                if (e.key === "Escape" && urlValue) { e.stopPropagation(); setUrlValue(""); }
+              }}
+              placeholder={t("add.magnetOrUrl")}
+              autoFocus={!initialSources?.length && !initialFiles?.length}
+              className="flex-1 px-3 py-1.5 rounded text-xs outline-none"
+              style={{
+                background: "var(--bg-secondary)",
+                border: "1px solid var(--border)",
+                color: "var(--text-primary)",
+              }}
+            />
             <button
               type="button"
-              onClick={() => setShowUrlInput(!showUrlInput)}
-              className="px-3 py-1.5 rounded text-xs"
-              style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
+              onClick={() => addUrl(urlValue)}
+              disabled={!urlValue.trim()}
+              className="px-3 py-1.5 rounded text-xs font-medium disabled:opacity-40"
+              style={{ background: "var(--accent-dim)", color: "white" }}
             >
-              {t("add.addUrlMagnet")}
+              {t("common.add")}
             </button>
             <input
               ref={fileRef}
@@ -500,38 +517,6 @@ export function AddDialog({ onClose, initialFiles, initialSources, existingHashe
               onChange={handleFileSelect}
             />
           </div>
-
-          {showUrlInput && (
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={urlValue}
-                onChange={(e) => setUrlValue(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") { e.preventDefault(); addUrl(urlValue); }
-                  // Escape here closes the URL field, not the dialog behind it
-                  if (e.key === "Escape") { e.stopPropagation(); setShowUrlInput(false); }
-                }}
-                placeholder={t("add.magnetOrUrl")}
-                autoFocus
-                className="flex-1 px-3 py-1.5 rounded text-xs outline-none"
-                style={{
-                  background: "var(--bg-secondary)",
-                  border: "1px solid var(--border)",
-                  color: "var(--text-primary)",
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => addUrl(urlValue)}
-                disabled={!urlValue.trim()}
-                className="px-3 py-1.5 rounded text-xs font-medium disabled:opacity-40"
-                style={{ background: "var(--accent-dim)", color: "white" }}
-              >
-                {t("common.add")}
-              </button>
-            </div>
-          )}
 
           {hasTorrents && (
             <div
@@ -741,7 +726,7 @@ export function AddDialog({ onClose, initialFiles, initialSources, existingHashe
               className="px-3 py-1.5 rounded text-xs font-medium disabled:opacity-40"
               style={{ background: "var(--accent-dim)", color: "white" }}
             >
-              {loading ? t("add.adding") : checkedTorrents.length > 1 ? t("add.addCount", { count: checkedTorrents.length }) : t("common.add")}
+              {loading ? t("add.adding") : submitTorrents.length > 1 ? t("add.addCount", { count: submitTorrents.length }) : t("common.add")}
             </button>
           </div>
         </form>

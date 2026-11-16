@@ -190,7 +190,6 @@
   "add.title": "Добавить торрент",
   "add.titleMultiple": "Добавить торренты",
   "add.browseTorrent": "Выбрать .torrent",
-  "add.addUrlMagnet": "Добавить URL / Magnet",
   "add.magnetOrUrl": "Magnet-ссылка или URL...",
   "add.duplicate": "ДУБЛИКАТ",
   "add.error": "ОШИБКА",
