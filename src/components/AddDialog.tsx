@@ -467,7 +467,7 @@ export function AddDialog({ onClose, initialFiles, initialSources, existingHashe
       onClose={onClose}
       backdropOpacity={0.6}
       panelClassName="rounded-lg p-4 flex flex-col"
-      panelStyle={{ width: "680px", height: "85vh" }}
+      size="tall"
     >
         <h2 className="text-sm font-semibold mb-3">
           {torrents.length > 1 ? t("add.titleMultiple") : t("add.title")}

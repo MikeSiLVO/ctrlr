@@ -117,7 +117,7 @@ export function SettingsDialog({
       dismissible={!required}
       panelClassName="rounded-lg flex"
       // one size for every tab; resizing per tab moves the sidebar out from under the cursor
-      panelStyle={{ width: "780px", height: "520px" }}
+      size="panel"
     >
         <div
           className="flex flex-col gap-1 p-3 shrink-0 w-[130px]"

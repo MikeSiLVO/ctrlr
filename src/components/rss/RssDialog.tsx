@@ -33,7 +33,7 @@ export function RssDialog({ onClose }: { onClose: () => void }) {
     <DialogShell
       onClose={onClose}
       panelClassName="rounded-lg flex"
-      panelStyle={{ width: "780px", height: "520px" }}
+      size="full"
     >
         <div
           className="flex flex-col gap-1 p-3 shrink-0 w-[130px]"

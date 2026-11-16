@@ -93,12 +93,24 @@ export function SidebarTab({ label, active, onClick }: { label: string; active: 
   );
 }
 
+/** Largest size a dialog may take, leaving a margin to the window edge. */
+const FIT = { width: "calc(100vw - 48px)", height: "calc(100vh - 48px)" };
+
+/** Dialog panel sizes, each kept inside the window. */
+const DIALOG_SIZES = {
+  compact: { maxWidth: FIT.width, maxHeight: FIT.height },
+  panel: { width: `min(780px, ${FIT.width})`, height: `min(520px, ${FIT.height})` },
+  tall: { width: `min(680px, ${FIT.width})`, height: `min(85vh, ${FIT.height})` },
+  full: FIT,
+} satisfies Record<string, React.CSSProperties>;
+
 /** Centered dialog panel on a backdrop; Escape or backdrop click closes it, when allowed. */
 export function DialogShell({
   onClose,
   dismissible = true,
   zIndex = 50,
   backdropOpacity = 0.7,
+  size = "compact",
   panelStyle,
   panelClassName = "rounded-lg flex flex-col",
   children,
@@ -107,7 +119,8 @@ export function DialogShell({
   dismissible?: boolean;
   zIndex?: number;
   backdropOpacity?: number;
-  panelStyle: React.CSSProperties;
+  size?: keyof typeof DIALOG_SIZES;
+  panelStyle?: React.CSSProperties;
   panelClassName?: string;
   children: React.ReactNode;
 }) {
@@ -124,6 +137,7 @@ export function DialogShell({
         style={{
           background: "var(--bg-primary)",
           border: "1px solid var(--border)",
+          ...DIALOG_SIZES[size],
           ...panelStyle,
         }}
         onClick={(e) => e.stopPropagation()}

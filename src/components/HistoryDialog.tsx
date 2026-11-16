@@ -172,7 +172,7 @@ export function HistoryDialog({ onClose }: HistoryDialogProps) {
     <DialogShell
       onClose={onClose}
       panelClassName="rounded-lg flex flex-col"
-      panelStyle={{ width: "860px", height: "560px" }}
+      size="full"
     >
         <div
           className="flex items-center gap-3 px-4 py-3 shrink-0"
