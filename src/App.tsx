@@ -480,7 +480,17 @@ export default function App() {
     }).catch((e) => console.error("Failed to list profiles:", e));
   }
 
+  /** Reset the old server's rows, selection, details and notification baseline. */
+  function resetServerState() {
+    resetTorrents();
+    prevTorrentsRef.current = null;
+    setSelectedHashes(new Set());
+    setLastSelectedHash(null);
+    resetDetails();
+  }
+
   function handleConnected() {
+    resetServerState();
     setConnected(true);
     setShowSettings(false);
     refreshProfiles();
@@ -496,12 +506,7 @@ export default function App() {
     try {
       setActionError(null);
       await api.switchProfile(name);
-      // old server's rows and notification baseline must not mix with the new server's
-      resetTorrents();
-      prevTorrentsRef.current = null;
-      setSelectedHashes(new Set());
-      setLastSelectedHash(null);
-      resetDetails();
+      resetServerState();
       setActiveProfile(name);
       setConnected(true);
       try {
@@ -519,6 +524,7 @@ export default function App() {
     try {
       setActionError(null);
       await api.disconnect();
+      resetServerState();
       setConnected(false);
       setActiveProfile(null);
       refreshProfiles();
@@ -814,6 +820,7 @@ export default function App() {
         <SettingsDialog
           onConnected={handleConnected}
           onDisconnected={() => {
+            resetServerState();
             setConnected(false);
             setShowSettings(false);
             refreshProfiles();
