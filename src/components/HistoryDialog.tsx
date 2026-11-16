@@ -61,13 +61,14 @@ function SourceBadge({ source }: { source: string }) {
     magnet: "#a78bfa",
     rss: "#f59e0b",
   };
+  const tint = colors[source] || "var(--border)";
   return (
     <span
       className="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase"
       style={{
-        background: `${colors[source] || "var(--border)"}22`,
+        background: `color-mix(in srgb, ${tint} 13%, transparent)`,
         color: colors[source] || "var(--text-secondary)",
-        border: `1px solid ${colors[source] || "var(--border)"}44`,
+        border: `1px solid color-mix(in srgb, ${tint} 27%, transparent)`,
       }}
     >
       {source}
