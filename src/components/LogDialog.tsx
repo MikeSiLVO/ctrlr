@@ -1,45 +1,36 @@
-import { useState, useEffect, useRef, Fragment } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { useTranslation } from "react-i18next";
 import { listen } from "@tauri-apps/api/event";
 import * as api from "../api";
 import type { LogEntry } from "../types";
+import { DialogShell } from "./ui";
 
-/** Panel entry cap, the same as the backend buffer's. */
+/** Dialog entry cap, the same as the backend buffer's. */
 const MAX_ENTRIES = 500;
 
-/** Activity log panel, live from backend events and pinned to the bottom unless scrolled up. */
-export function LogPanel() {
+/** Activity log dialog, newest entry first, live from backend events. */
+export function LogDialog({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
-  const [entries, setEntries] = useState<LogEntry[]>([]);
-  const listRef = useRef<HTMLDivElement>(null);
-  const autoScrollRef = useRef(true);
+  // dropped keeps row keys stable as the oldest entries are trimmed
+  const [log, setLog] = useState<{ entries: LogEntry[]; dropped: number }>({ entries: [], dropped: 0 });
 
   useEffect(() => {
-    api.getActivityLog().then(setEntries);
+    api.getActivityLog().then((entries) => setLog({ entries, dropped: 0 }));
   }, []);
 
   useEffect(() => {
     const unlisten = listen<LogEntry>("activity-log", (event) => {
-      setEntries((prev) => {
-        const next = [...prev, event.payload];
-        if (next.length > MAX_ENTRIES) next.splice(0, next.length - MAX_ENTRIES);
-        return next;
+      setLog((prev) => {
+        const next = [...prev.entries, event.payload];
+        const excess = Math.max(0, next.length - MAX_ENTRIES);
+        return { entries: next.slice(excess), dropped: prev.dropped + excess };
       });
     });
     return () => { unlisten.then((f) => f()); };
   }, []);
 
-  useEffect(() => {
-    if (autoScrollRef.current && listRef.current) {
-      listRef.current.scrollTop = listRef.current.scrollHeight;
-    }
-  }, [entries]);
-
-  function handleScroll() {
-    if (!listRef.current) return;
-    const { scrollTop, scrollHeight, clientHeight } = listRef.current;
-    autoScrollRef.current = scrollHeight - scrollTop - clientHeight < 30;
-  }
+  const entries = log.entries;
+  const newestFirst = entries.map((entry, i) => ({ entry, key: log.dropped + i })).reverse();
 
   function formatTime(ts: number): string {
     const d = new Date(ts);
@@ -78,36 +69,33 @@ export function LogPanel() {
   };
 
   return (
-    <div className="flex flex-col h-full" style={{ background: "var(--bg-primary)" }}>
-      <div
-        className="flex items-center justify-between px-3 py-1 shrink-0"
-        style={{ borderBottom: "1px solid var(--border)", background: "var(--bg-secondary)" }}
-      >
-        <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
-          {t("log.title")} ({entries.length})
-        </span>
+    <DialogShell
+      onClose={onClose}
+      title={`${t("log.title")} (${entries.length})`}
+      headerExtra={
         <button
-          className="text-xs px-2 py-0.5 rounded"
-          style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
-          onClick={() => { api.clearActivityLog(); setEntries([]); }}
+          type="button"
+          className="px-2 py-1 rounded text-xs"
+          style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
+          onClick={() => { api.clearActivityLog(); setLog({ entries: [], dropped: 0 }); }}
         >
           {t("common.clear")}
         </button>
-      </div>
+      }
+      size="full"
+    >
       <div
-        ref={listRef}
-        className="flex-1 overflow-y-auto overflow-x-hidden font-mono"
+        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden font-mono"
         style={{ fontSize: "12px" }}
-        onScroll={handleScroll}
       >
         {entries.length === 0 ? (
           <div className="px-3 py-4 text-center" style={{ color: "var(--text-secondary)", fontSize: "12px" }}>
             {t("log.noEntries")}
           </div>
         ) : (
-          entries.map((entry, i) => (
-            <Fragment key={`${entry.timestamp}-${i}`}>
-              {(i === 0 || !sameDay(entries[i - 1].timestamp, entry.timestamp)) && (
+          newestFirst.map(({ entry, key }, i) => (
+            <Fragment key={key}>
+              {(i === 0 || !sameDay(newestFirst[i - 1].entry.timestamp, entry.timestamp)) && (
                 <div
                   className="sticky top-0 px-3 font-sans font-medium"
                   style={{
@@ -155,6 +143,6 @@ export function LogPanel() {
           ))
         )}
       </div>
-    </div>
+    </DialogShell>
   );
 }

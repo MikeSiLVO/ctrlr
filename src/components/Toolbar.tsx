@@ -6,7 +6,6 @@ import { ConnectionPopover } from "./ConnectionPopover";
 interface ToolbarProps {
   hasSelection: boolean;
   isPaused: boolean;
-  showLog: boolean;
   showSearchBar: boolean;
   searchText: string;
   onSearchChange: (text: string) => void;
@@ -14,7 +13,7 @@ interface ToolbarProps {
   onRemove: () => void;
   onTogglePause: () => void;
   onRecheck: () => void;
-  onToggleLog: () => void;
+  onLog: () => void;
   onSettings: () => void;
   onRss: () => void;
   onHistory: () => void;
@@ -58,7 +57,6 @@ function ToolbarButton({
 export function Toolbar({
   hasSelection,
   isPaused,
-  showLog,
   showSearchBar,
   searchText,
   onSearchChange,
@@ -66,7 +64,7 @@ export function Toolbar({
   onRemove,
   onTogglePause,
   onRecheck,
-  onToggleLog,
+  onLog,
   onSettings,
   onRss,
   onHistory,
@@ -132,16 +130,7 @@ export function Toolbar({
         className="mx-0.5"
         style={{ width: 1, height: 20, background: "var(--border)" }}
       />
-      <button
-        onClick={onToggleLog}
-        className="px-3 py-1 rounded text-xs font-medium transition-colors"
-        style={{
-          background: showLog ? "var(--accent)" : "var(--bg-tertiary)",
-          color: showLog ? "#fff" : "var(--text-primary)",
-        }}
-      >
-        {t("toolbar.log")}
-      </button>
+      <ToolbarButton label={t("toolbar.log")} onClick={onLog} />
       <ToolbarButton label={t("toolbar.rss")} onClick={onRss} />
       <ToolbarButton label={t("toolbar.history")} onClick={onHistory} />
       <ToolbarButton label={t("toolbar.settings")} onClick={onSettings} />

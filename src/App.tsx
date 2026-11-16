@@ -14,7 +14,7 @@ import { Toolbar } from "./components/Toolbar";
 import { Sidebar } from "./components/Sidebar";
 import { TorrentTable } from "./components/TorrentTable";
 import { DetailPanel } from "./components/detail/DetailPanel";
-import { LogPanel } from "./components/LogPanel";
+import { LogDialog } from "./components/LogDialog";
 import { StatusBar } from "./components/StatusBar";
 import { AddDialog } from "./components/AddDialog";
 import { SettingsDialog } from "./components/settings/SettingsDialog";
@@ -393,7 +393,6 @@ export default function App() {
   const selectedHashArray = selectedTorrents.map((t) => t.hash);
 
   const handleSelect = useCallback((hash: string, e: React.MouseEvent) => {
-    setShowLog(false);
     if (e.shiftKey && lastSelectedHash) {
       const anchorIdx = displayed.findIndex((t) => t.hash === lastSelectedHash);
       const clickIdx = displayed.findIndex((t) => t.hash === hash);
@@ -667,7 +666,6 @@ export default function App() {
       <Toolbar
         hasSelection={selectedHashArray.length > 0}
         isPaused={isAnyPaused(selectedTorrents)}
-        showLog={showLog}
         showSearchBar={showSearchBar}
         searchText={searchText}
         onSearchChange={setSearchText}
@@ -679,7 +677,7 @@ export default function App() {
           else handlePause();
         }}
         onRecheck={handleRecheck}
-        onToggleLog={() => setShowLog(!showLog)}
+        onLog={() => setShowLog(true)}
         onRss={() => setShowRss(true)}
         onHistory={() => setShowHistory(true)}
         onSettings={() => { setSettingsContext(null); setShowSettings(true); }}
@@ -747,15 +745,11 @@ export default function App() {
             className="overflow-auto"
             style={{ height: `${detailHeight}px` }}
           >
-            {showLog ? (
-              <LogPanel />
-            ) : (
-              <DetailPanel
-                torrent={selected}
-                details={details}
-                capabilities={capabilities}
-              />
-            )}
+            <DetailPanel
+              torrent={selected}
+              details={details}
+              capabilities={capabilities}
+            />
           </div>
         </div>
       </div>
@@ -810,6 +804,10 @@ export default function App() {
 
       {showHistory && (
         <HistoryDialog onClose={() => setShowHistory(false)} />
+      )}
+
+      {showLog && (
+        <LogDialog onClose={() => setShowLog(false)} />
       )}
 
       {showSettings && (
