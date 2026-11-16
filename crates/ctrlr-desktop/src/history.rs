@@ -1,5 +1,7 @@
 //! Torrent History: recording adds, syncing to the loaded list, and the History dialog's commands.
 
+use std::sync::Arc;
+
 use tauri::{Emitter, State};
 
 use ctrlr_core::RtorrentClient;
@@ -38,10 +40,16 @@ pub(crate) async fn archive_blob(db: &Database, log: &ActivityLog, client: &Rtor
 }
 
 /// Sync History's live entries to the loaded list once per change, emitting `history-synced`.
-pub(crate) async fn sync_history(app: &tauri::AppHandle, state: &AppState, client: &RtorrentClient, torrents: &[Torrent]) {
+pub(crate) async fn sync_history(
+    app: &tauri::AppHandle, state: &AppState, client: &Arc<RtorrentClient>, torrents: &[Torrent],
+) {
     let mut hashes: Vec<String> = torrents.iter().map(|t| t.hash.to_uppercase()).collect();
     hashes.sort_unstable();
     let mut sync = state.history_sync.lock().await;
+    // a list from a client since replaced or dropped belongs to no server's sync
+    if !state.client.lock().await.as_ref().is_some_and(|live| Arc::ptr_eq(live, client)) {
+        return;
+    }
     if sync.synced.as_ref() == Some(&hashes) {
         return;
     }
