@@ -51,15 +51,19 @@ fn extract_show_name(title: &str, marker_start: usize) -> String {
         .to_string()
 }
 
-/// Extract the resolution tag in lowercase, with 4K and UHD as 2160p.
+/// Normalize a resolution tag or preference, 4K and UHD as 2160p, 1080 as 1080p; None if unknown.
+pub fn normalize_quality(quality: &str) -> Option<String> {
+    let q = quality.trim().to_lowercase();
+    match q.strip_suffix('p').unwrap_or(&q) {
+        "4k" | "uhd" | "2160" => Some("2160p".to_string()),
+        res @ ("1080" | "720" | "480") => Some(format!("{res}p")),
+        _ => None,
+    }
+}
+
+/// Extract the resolution tag, normalized.
 fn extract_quality(title: &str) -> Option<String> {
-    RE_QUALITY.captures(title).map(|c| {
-        let q = c[1].to_uppercase();
-        match q.as_str() {
-            "4K" | "UHD" => "2160p".to_string(),
-            _ => q.to_lowercase(),
-        }
-    })
+    RE_QUALITY.captures(title).and_then(|c| normalize_quality(&c[1]))
 }
 
 /// Extract the release source tag as written in the title.
@@ -126,10 +130,10 @@ pub fn parse_episode(title: &str) -> Option<EpisodeInfo> {
     None
 }
 
-/// Rank of a quality in the preference list, 0 is most preferred, None when absent.
+/// Rank of a quality in the preference list, both normalized; 0 is most preferred, None if absent.
 pub fn quality_rank(quality: &str, preferences: &[String]) -> Option<usize> {
-    let q = quality.to_lowercase();
-    preferences.iter().position(|p| p.to_lowercase() == q)
+    let q = normalize_quality(quality)?;
+    preferences.iter().position(|p| normalize_quality(p).as_ref() == Some(&q))
 }
 
 #[cfg(test)]
@@ -213,6 +217,15 @@ mod tests {
     #[test]
     fn test_no_match() {
         assert!(parse_episode("Ubuntu 24.04 Desktop amd64").is_none());
+    }
+
+    /// Normalize 4K, UHD and bare or uppercase resolutions; leave anything else unknown.
+    #[test]
+    fn normalizes_quality_spellings() {
+        for (input, expected) in [("4K", "2160p"), ("uhd", "2160p"), ("1080", "1080p"), (" 720P ", "720p")] {
+            assert_eq!(normalize_quality(input).as_deref(), Some(expected));
+        }
+        assert_eq!(normalize_quality("HDR"), None);
     }
 
     /// Rank a quality by its index in the preference list, none when it is absent.

@@ -552,7 +552,7 @@ export async function rssListRules(): Promise<RssRuleEntry[]> {
   return invoke("rss_list_rules");
 }
 
-/** Save a rule, creating or replacing it by key; refuses broken patterns or a catch-all exclude. */
+/** Save a rule by key; refuses a broken pattern, a catch-all exclude or an unknown quality. */
 export async function rssSaveRule(rule: RssRuleEntry): Promise<void> {
   return invoke("rss_save_rule", { rule });
 }

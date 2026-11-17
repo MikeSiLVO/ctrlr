@@ -556,7 +556,7 @@ pub async fn rss_list_rules(state: State<'_, AppState>) -> Result<Vec<RssRuleEnt
         .collect())
 }
 
-/// Save a rule, creating or replacing one by key; refuses broken patterns or a catch-all exclude.
+/// Save a rule by key; refuses a broken pattern, a catch-all exclude or an unknown quality.
 #[tauri::command]
 pub async fn rss_save_rule(state: State<'_, AppState>, rule: RssRuleEntry) -> Result<(), String> {
     let key = rule.key.clone();

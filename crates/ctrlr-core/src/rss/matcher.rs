@@ -45,8 +45,11 @@ fn cached_regex(pattern: &str) -> Option<Regex> {
         .clone()
 }
 
-/// Validate a rule's patterns: each must compile, and the exclude must not match every title.
+/// Validate a rule: patterns compile, the exclude doesn't match every title, qualities are known.
 pub fn validate_rule(rule: &RssRule) -> Result<(), String> {
+    if let Some(q) = rule.quality.iter().find(|q| parser::normalize_quality(q).is_none()) {
+        return Err(format!("unknown quality '{q}'; use 2160p, 1080p, 720p or 480p"));
+    }
     Regex::new(&format!("(?i){}", rule.pattern)).map_err(|e| format!("invalid pattern: {e}"))?;
     if rule.exclude.is_empty() {
         return Ok(());
@@ -318,6 +321,29 @@ mod tests {
         assert_eq!(same.as_deref(), Some("already have 1080p quality"));
         let worse = quality_verdict("Test.Show.S01E01.1080p", "Test.Show.S01E01.720p");
         assert_eq!(worse.as_deref(), Some("already have 1080p quality"));
+    }
+
+    /// Match titles against 4K and bare 1080 preferences by their normalized tags.
+    #[test]
+    fn preferences_match_normalized_quality() {
+        let mut rule = test_rule(true);
+        rule.quality = vec!["4K".into(), "1080".into()];
+        let history = empty_history();
+        let reason = |title: &str| match_item(title, "g", &rule, &history).unwrap().skip_reason;
+        assert_eq!(reason("Test.Show.S01E01.2160p.WEB"), None);
+        assert_eq!(reason("Test.Show.S01E01.UHD.WEB"), None);
+        assert_eq!(reason("Test.Show.S01E01.1080p.WEB"), None);
+        assert_eq!(reason("Test.Show.S01E01.720p.WEB").as_deref(), Some("quality not in preferences"));
+    }
+
+    /// Refuse a quality preference that isn't a known resolution; accept 4K and bare numbers.
+    #[test]
+    fn validate_rule_refuses_unknown_quality() {
+        let mut rule = test_rule(false);
+        rule.quality = vec!["4K".into(), "1080".into()];
+        assert!(validate_rule(&rule).is_ok());
+        rule.quality.push("HDR".into());
+        assert!(validate_rule(&rule).unwrap_err().contains("unknown quality 'HDR'"));
     }
 
     /// Refuse an exclude with an empty alternative or a broken pattern; accept a plain exclude.
