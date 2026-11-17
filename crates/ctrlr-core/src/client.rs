@@ -358,22 +358,40 @@ impl RtorrentClient {
         Ok(())
     }
 
+    /// Path of a torrent's data on the rTorrent host, an error when rTorrent can't say where it is.
+    async fn data_path(&self, hash: &str) -> Result<String, RpcError> {
+        let base = self.call("d.base_path", vec![json!(hash)]).await?;
+        if let Some(path) = base.as_str().filter(|p| !p.is_empty()) {
+            return Ok(path.to_string());
+        }
+        // d.base_path stays empty until the torrent is opened once after rTorrent starts
+        let r = self.call_batch(vec![
+            ("d.directory".into(), vec![json!(hash)]),
+            ("d.is_multi_file".into(), vec![json!(hash)]),
+            ("f.path".into(), vec![json!(format!("{hash}:f0"))]),
+        ]).await?;
+        let dir = r[0].as_str().unwrap_or("").trim_end_matches('/');
+        let file = r[2].as_str().unwrap_or("");
+        match (dir, r[1].as_i64() == Some(1)) {
+            ("", _) => Err(RpcError::Protocol("rTorrent did not report the torrent's data path".into())),
+            (dir, true) => Ok(dir.to_string()),
+            (_, false) if file.is_empty() => {
+                Err(RpcError::Protocol("rTorrent did not report the torrent's file path".into()))
+            }
+            (dir, false) => Ok(format!("{dir}/{file}")),
+        }
+    }
+
     /// Remove a torrent from rTorrent, optionally running rm -rf on its data first.
     async fn remove_torrent(&self, hash: &str, delete_data: bool) -> Result<(), RpcError> {
-        let base_path = if delete_data {
-            let val = self.call("d.base_path", vec![json!(hash)]).await?;
-            Some(val.as_str().unwrap_or("").to_string())
-        } else {
-            None
-        };
+        let data = if delete_data { Some(self.data_path(hash).await?) } else { None };
 
         self.call("d.stop", vec![json!(hash)]).await?;
         self.call("d.close", vec![json!(hash)]).await?;
 
-        if let Some(path) = &base_path
-            && !path.is_empty() {
-                self.call("execute2", vec![json!(""), json!("rm"), json!("-rf"), json!("--"), json!(path)]).await?;
-            }
+        if let Some(path) = &data {
+            self.call("execute2", vec![json!(""), json!("rm"), json!("-rf"), json!("--"), json!(path)]).await?;
+        }
 
         self.call("d.erase", vec![json!(hash)]).await?;
         Ok(())
@@ -597,7 +615,7 @@ impl RtorrentClient {
         self.set_file_flag(hash, index, method).await
     }
 
-    /// Set a file flag, then d.update_priorities; libtorrent reads the flag only on a priority update.
+    /// Set a file flag, then d.update_priorities; libtorrent reads flags only on a priority update.
     async fn set_file_flag(&self, hash: &str, index: usize, method: &str) -> Result<(), RpcError> {
         self.call_batch(vec![
             (method.into(), vec![json!(format!("{hash}:f{index}"))]),
@@ -624,42 +642,30 @@ impl RtorrentClient {
     async fn move_torrent(&self, hash: &str, directory: &str) -> Result<(), RpcError> {
         let was_open = self.call("d.is_open", vec![json!(hash)]).await?.as_i64() == Some(1);
         let was_active = self.call("d.is_active", vec![json!(hash)]).await?.as_i64() == Some(1);
-
-        self.call("d.stop", vec![json!(hash)]).await?;
-        self.call("d.close", vec![json!(hash)]).await?;
-
-        let base_path = self.call("d.base_path", vec![json!(hash)]).await?;
-        let base_path = base_path.as_str().unwrap_or("");
+        let data = self.data_path(hash).await?;
         let old_dir = self.call("d.directory", vec![json!(hash)]).await?;
         let old_dir = old_dir.as_str().unwrap_or("").to_string();
 
+        self.call("d.stop", vec![json!(hash)]).await?;
+        self.call("d.close", vec![json!(hash)]).await?;
         self.call("d.directory.set", vec![json!(hash), json!(directory)]).await?;
 
         // the prior state comes back even when mv fails
-        let mv_err = if !base_path.is_empty() {
-            self.call("execute2", vec![
-                json!(""), json!("mv"), json!("--"), json!(base_path), json!(directory),
-            ]).await.err()
-        } else {
-            None
-        };
+        let mv_err = self.call("execute2", vec![
+            json!(""), json!("mv"), json!("--"), json!(data), json!(directory),
+        ]).await.err();
 
-        // data never left the old dir
+        // data never left the old dir; only the base setter restores the exact root
         if mv_err.is_some() && !old_dir.is_empty() {
-            self.call("d.directory.set", vec![json!(hash), json!(old_dir)]).await.ok();
+            self.call("d.directory_base.set", vec![json!(hash), json!(old_dir)]).await.ok();
         }
 
-        if was_open {
-            self.call("d.open", vec![json!(hash)]).await?;
+        let open_err = if was_open { self.call("d.open", vec![json!(hash)]).await.err() } else { None };
+        let start_err = if was_active { self.call("d.start", vec![json!(hash)]).await.err() } else { None };
+        match mv_err.or(open_err).or(start_err) {
+            Some(e) => Err(e),
+            None => Ok(()),
         }
-        if was_active {
-            self.call("d.start", vec![json!(hash)]).await?;
-        }
-
-        if let Some(e) = mv_err {
-            return Err(e);
-        }
-        Ok(())
     }
 
     /// Set a file's priority by 0-based index, 0 off, 1 normal, 2 high, and apply it.
