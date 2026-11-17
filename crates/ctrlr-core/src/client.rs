@@ -15,6 +15,26 @@ fn quote_arg(value: &str) -> String {
     value.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
+/// Paths to delete: the files, then folders deepest first, the root only if named for the torrent.
+fn deletion_plan(root: &str, multi_file: bool, name: &str, rel_paths: &[&str]) -> (Vec<String>, Vec<String>) {
+    if !multi_file {
+        return (vec![root.to_string()], vec![]);
+    }
+    let files = rel_paths.iter().map(|p| format!("{root}/{p}")).collect();
+    let mut dirs: Vec<String> = rel_paths.iter()
+        .flat_map(|p| p.match_indices('/').map(move |(i, _)| &p[..i]))
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .map(|d| format!("{root}/{d}"))
+        .collect();
+    dirs.sort_by_key(|d| std::cmp::Reverse(d.matches('/').count()));
+    // a root not named for the torrent is a shared download folder
+    if root.rsplit('/').next() == Some(name) {
+        dirs.push(root.to_string());
+    }
+    (files, dirs)
+}
+
 /// Torrent file bytes as a base64 data: URI, which load commands accept in place of a path.
 fn torrent_data_uri(data: &[u8]) -> String {
     use base64::Engine;
@@ -382,15 +402,51 @@ impl RtorrentClient {
         }
     }
 
-    /// Remove a torrent from rTorrent, optionally running rm -rf on its data first.
+    /// Files and folders deleting a torrent's data removes; an error if rTorrent lists no files.
+    async fn data_to_delete(&self, hash: &str) -> Result<(Vec<String>, Vec<String>), RpcError> {
+        let root = self.data_path(hash).await?;
+        let r = self.call_batch(vec![
+            ("d.is_multi_file".into(), vec![json!(hash)]),
+            ("d.name".into(), vec![json!(hash)]),
+            ("f.multicall".into(), vec![json!(hash), json!(""), json!("f.path=")]),
+        ]).await?;
+        let multi_file = r[0].as_i64() == Some(1);
+        let rel_paths: Vec<&str> = r[2].as_array().into_iter().flatten()
+            .filter_map(|row| row.get(0).and_then(|v| v.as_str()))
+            .filter(|p| !p.is_empty())
+            .collect();
+        if multi_file && rel_paths.is_empty() {
+            return Err(RpcError::Protocol("rTorrent did not list the torrent's files".into()));
+        }
+        Ok(deletion_plan(&root, multi_file, r[1].as_str().unwrap_or(""), &rel_paths))
+    }
+
+    /// Execute a command on the rTorrent host over paths, in chunks under its argument limit.
+    async fn execute_on_paths(&self, command: &str, flags: &[&str], paths: &[String]) -> Result<(), RpcError> {
+        let calls: Vec<(String, Vec<serde_json::Value>)> = paths.chunks(200).map(|chunk| {
+            let args = [json!(""), json!(command)].into_iter()
+                .chain(flags.iter().map(|f| json!(f)))
+                .chain(chunk.iter().map(|p| json!(p)))
+                .collect();
+            ("execute2".to_string(), args)
+        }).collect();
+        if !calls.is_empty() {
+            self.call_batch(calls).await?;
+        }
+        Ok(())
+    }
+
+    /// Remove a torrent from rTorrent, optionally deleting its files and emptied folders first.
     async fn remove_torrent(&self, hash: &str, delete_data: bool) -> Result<(), RpcError> {
-        let data = if delete_data { Some(self.data_path(hash).await?) } else { None };
+        let data = if delete_data { Some(self.data_to_delete(hash).await?) } else { None };
 
         self.call("d.stop", vec![json!(hash)]).await?;
         self.call("d.close", vec![json!(hash)]).await?;
 
-        if let Some(path) = &data {
-            self.call("execute2", vec![json!(""), json!("rm"), json!("-rf"), json!("--"), json!(path)]).await?;
+        if let Some((files, dirs)) = &data {
+            self.execute_on_paths("rm", &["-f", "--"], files).await?;
+            // rmdir refuses a folder still holding anything else
+            self.execute_on_paths("rmdir", &["--"], dirs).await.ok();
         }
 
         self.call("d.erase", vec![json!(hash)]).await?;
@@ -983,5 +1039,35 @@ impl RtorrentClient {
                 ).await
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Plan a single file as itself with no folders to remove.
+    #[test]
+    fn plans_a_single_file() {
+        let (files, dirs) = deletion_plan("/dl/a.mkv", false, "a.mkv", &["a.mkv"]);
+        assert_eq!(files, ["/dl/a.mkv"]);
+        assert!(dirs.is_empty());
+    }
+
+    /// Plan a torrent's own folder: its files, subfolders deepest first, then the root last.
+    #[test]
+    fn plans_an_own_folder_deepest_first() {
+        let rel = ["S1/E1.mkv", "S1/extras/a.nfo", "info.txt"];
+        let (files, dirs) = deletion_plan("/dl/Show", true, "Show", &rel);
+        assert_eq!(files, ["/dl/Show/S1/E1.mkv", "/dl/Show/S1/extras/a.nfo", "/dl/Show/info.txt"]);
+        assert_eq!(dirs, ["/dl/Show/S1/extras", "/dl/Show/S1", "/dl/Show"]);
+    }
+
+    /// Plan a torrent saved straight into a shared folder without ever removing that folder.
+    #[test]
+    fn never_plans_a_shared_root() {
+        let (files, dirs) = deletion_plan("/downloads", true, "Show", &["E1.mkv", "sub/E2.mkv"]);
+        assert_eq!(files, ["/downloads/E1.mkv", "/downloads/sub/E2.mkv"]);
+        assert_eq!(dirs, ["/downloads/sub"]);
     }
 }
