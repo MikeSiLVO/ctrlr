@@ -190,13 +190,13 @@ impl ConnectionConfig {
     }
 }
 
-/// Connect to the config file's active profile, or to localhost:5000 when it has none.
+/// Connect to the config file's active profile, None when it names none.
 pub async fn connect_from_config(
-) -> Result<(crate::RtorrentClient, Option<Arc<crate::SshTunnel>>), Box<dyn std::error::Error>> {
+) -> Result<Option<(crate::RtorrentClient, Option<Arc<crate::SshTunnel>>)>, Box<dyn std::error::Error>> {
     let config = Config::load()?;
     match config.active_connection() {
-        Some(conn) => connect_with_config(&config.active, conn).await,
-        None => Ok((crate::RtorrentClient::tcp("localhost", 5000), None)),
+        Some(conn) => connect_with_config(&config.active, conn).await.map(Some),
+        None => Ok(None),
     }
 }
 

@@ -241,7 +241,8 @@ fn update_tray_info(
 #[tokio::main]
 async fn main() {
     let (client, tunnel, connect_error) = match config::connect_from_config().await {
-        Ok((c, t)) => (Some(c), t, None),
+        Ok(Some((c, t))) => (Some(c), t, None),
+        Ok(None) => (None, None, None),
         Err(e) => (None, None, Some((is_unreachable(&*e), e.to_string()))),
     };
 
