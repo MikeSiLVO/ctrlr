@@ -408,10 +408,10 @@ impl RtorrentClient {
         let dir = r[0].as_str().unwrap_or("").trim_end_matches('/');
         let file = r[2].as_str().unwrap_or("");
         match (dir, r[1].as_i64() == Some(1)) {
-            ("", _) => Err(RpcError::Protocol("rTorrent did not report the torrent's data path".into())),
+            ("", _) => Err(RpcError::Command("rTorrent did not report the torrent's data path".into())),
             (dir, true) => Ok(dir.to_string()),
             (_, false) if file.is_empty() => {
-                Err(RpcError::Protocol("rTorrent did not report the torrent's file path".into()))
+                Err(RpcError::Command("rTorrent did not report the torrent's file path".into()))
             }
             (dir, false) => Ok(format!("{dir}/{file}")),
         }
@@ -431,7 +431,7 @@ impl RtorrentClient {
             .filter(|p| !p.is_empty())
             .collect();
         if multi_file && rel_paths.is_empty() {
-            return Err(RpcError::Protocol("rTorrent did not list the torrent's files".into()));
+            return Err(RpcError::Command("rTorrent did not list the torrent's files".into()));
         }
         Ok(deletion_plan(&root, multi_file, r[1].as_str().unwrap_or(""), &rel_paths))
     }
@@ -709,11 +709,25 @@ impl RtorrentClient {
         Ok(())
     }
 
-    /// Move a torrent's data to a new directory, then restore its stopped, paused or active state.
+    /// Move a torrent's data to a new directory, refusing a name clash, then restore its state.
     async fn move_torrent(&self, hash: &str, directory: &str) -> Result<(), RpcError> {
+        let data = self.data_path(hash).await?;
+        let name = data.rsplit('/').next().unwrap_or(&data);
+        let target = format!("{}/{name}", directory.trim_end_matches('/'));
+        if target == data {
+            return Ok(());
+        }
+        // mv merges nothing: a clashing folder fails it, a clashing file is silently replaced
+        let clash = self.call("execute.capture", vec![
+            json!(""), json!("sh"), json!("-c"),
+            json!(r#"if [ -e "$1" ] || [ -L "$1" ]; then echo y; fi"#), json!("sh"), json!(target),
+        ]).await?;
+        if clash.as_str().unwrap_or("").trim() == "y" {
+            return Err(RpcError::Command(format!("'{name}' already exists in {directory}")));
+        }
+
         let was_open = self.call("d.is_open", vec![json!(hash)]).await?.as_i64() == Some(1);
         let was_active = self.call("d.is_active", vec![json!(hash)]).await?.as_i64() == Some(1);
-        let data = self.data_path(hash).await?;
         let old_dir = self.call("d.directory", vec![json!(hash)]).await?;
         let old_dir = old_dir.as_str().unwrap_or("").to_string();
 
@@ -721,10 +735,17 @@ impl RtorrentClient {
         self.call("d.close", vec![json!(hash)]).await?;
         self.call("d.directory.set", vec![json!(hash), json!(directory)]).await?;
 
-        // the prior state comes back even when mv fails
-        let mv_err = self.call("execute2", vec![
-            json!(""), json!("mv"), json!("--"), json!(data), json!(directory),
-        ]).await.err();
+        // prior state comes back even when mv fails; sh hands back mv's own message
+        let moved = self.call("execute.capture", vec![
+            json!(""), json!("sh"), json!("-c"),
+            json!(r#"out=$(mv -- "$1" "$2" 2>&1) && echo ok || printf '%s\n' "$out"; exit 0"#),
+            json!("sh"), json!(data), json!(directory),
+        ]).await;
+        let mv_err = match moved {
+            Ok(out) if out.as_str().unwrap_or("").trim() == "ok" => None,
+            Ok(out) => Some(RpcError::Command(format!("could not move: {}", out.as_str().unwrap_or("").trim()))),
+            Err(e) => Some(e),
+        };
 
         // data never left the old dir; only the base setter restores the exact root
         if mv_err.is_some() && !old_dir.is_empty() {

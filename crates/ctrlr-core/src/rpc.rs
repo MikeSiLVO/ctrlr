@@ -42,6 +42,10 @@ pub enum RpcError {
     #[error("protocol error: {0}")]
     Protocol(String),
 
+    /// An operation on the rTorrent host that failed or was refused, with a message for the user.
+    #[error("{0}")]
+    Command(String),
+
     #[error("RPC error {code}: {message}")]
     Rpc { code: i64, message: String },
 
