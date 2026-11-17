@@ -290,6 +290,8 @@ export interface HistoryQuery {
 export interface RemoteDirectory {
   path: string;
   dirs: string[];
+  /** False when the server may enter the folder but not list it, as with /home on shared hosts. */
+  readable: boolean;
 }
 
 /** One page of history, with counts of entries and archived .torrents matching the filters. */

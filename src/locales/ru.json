@@ -456,6 +456,8 @@
 
   "directory.title": "Выбор каталога",
   "directory.noSubdirs": "Нет подкаталогов",
+  "directory.home": "Домашняя папка",
+  "directory.unreadable": "Не удаётся показать содержимое этой папки",
 
   "properties.title": "Свойства",
   "properties.uploadSlots": "Слоты отдачи",

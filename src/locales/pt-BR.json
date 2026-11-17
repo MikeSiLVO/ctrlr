@@ -456,6 +456,8 @@
 
   "directory.title": "Selecionar Diretório",
   "directory.noSubdirs": "Nenhum subdiretório",
+  "directory.home": "Pasta pessoal",
+  "directory.unreadable": "Não é possível listar esta pasta",
 
   "properties.title": "Propriedades",
   "properties.uploadSlots": "Slots de Upload",

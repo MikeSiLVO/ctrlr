@@ -456,6 +456,8 @@
 
   "directory.title": "选择目录",
   "directory.noSubdirs": "没有子目录",
+  "directory.home": "主文件夹",
+  "directory.unreadable": "无法列出此文件夹的内容",
 
   "properties.title": "属性",
   "properties.uploadSlots": "上传连接数",

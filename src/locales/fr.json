@@ -456,6 +456,8 @@
 
   "directory.title": "Sélectionner un répertoire",
   "directory.noSubdirs": "Aucun sous-répertoire",
+  "directory.home": "Dossier personnel",
+  "directory.unreadable": "Impossible de lister ce dossier",
 
   "properties.title": "Propriétés",
   "properties.uploadSlots": "Slots d'envoi",

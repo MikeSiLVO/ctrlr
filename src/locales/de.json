@@ -456,6 +456,8 @@
 
   "directory.title": "Verzeichnis auswählen",
   "directory.noSubdirs": "Keine Unterverzeichnisse",
+  "directory.home": "Persönlicher Ordner",
+  "directory.unreadable": "Dieser Ordner kann nicht aufgelistet werden",
 
   "properties.title": "Eigenschaften",
   "properties.uploadSlots": "Upload-Slots",

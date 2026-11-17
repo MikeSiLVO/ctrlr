@@ -27,6 +27,18 @@ export function CloseIcon({ size = 12 }: { size?: number }) {
   );
 }
 
+/** Outline house in the current text color. */
+export function HomeIcon({ size = 12 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 12 12" fill="none">
+      <path
+        d="M1.5 5.5L6 1.75L10.5 5.5M2.75 4.5V10.25H5V7.5H7V10.25H9.25V4.5"
+        stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 /** Filled triangle marking a sorted column's direction. */
 export function SortIcon({ asc, className }: { asc: boolean; className?: string }) {
   return (

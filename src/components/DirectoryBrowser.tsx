@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { DialogShell } from "./ui";
+import { HomeIcon } from "./icons";
 import * as api from "../api";
 
 /** Props for the remote directory picker. */
@@ -19,6 +20,7 @@ export function DirectoryBrowser({
   const { t } = useTranslation();
   const [currentPath, setCurrentPath] = useState(initialPath || "");
   const [dirs, setDirs] = useState<string[]>([]);
+  const [readable, setReadable] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,6 +46,7 @@ export function DirectoryBrowser({
       .then((dir) => {
         resolvedRef.current = dir.path;
         setDirs(dir.dirs);
+        setReadable(dir.readable);
         setCurrentPath(dir.path);
       })
       .catch((e) => setError(String(e)))
@@ -77,36 +80,51 @@ export function DirectoryBrowser({
       bodyClassName="p-4 flex flex-col"
       panelStyle={{ width: "500px", maxHeight: "70vh" }}
     >
-        <div
-          className="flex items-center gap-0.5 text-xs px-2 py-1.5 rounded mb-2 overflow-x-auto"
-          style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}
-        >
+        <div className="flex items-stretch gap-2 mb-2">
           <button
-            onClick={() => setCurrentPath("/")}
-            className="hover:underline shrink-0"
-            style={{ color: "var(--accent)" }}
+            onClick={() => setCurrentPath("~")}
+            title={t("directory.home")}
+            aria-label={t("directory.home")}
+            className="flex items-center justify-center px-2.5 rounded shrink-0"
+            style={{
+              background: "var(--bg-tertiary)",
+              border: "1px solid var(--border)",
+              color: "var(--text-primary)",
+            }}
           >
-            /
+            <HomeIcon />
           </button>
-          {pathParts.map((part, i) => (
-            <span key={i} className="flex items-center gap-0.5 shrink-0">
-              {i > 0 && <span style={{ color: "var(--text-secondary)" }}>/</span>}
-              <button
-                onClick={() =>
-                  setCurrentPath("/" + pathParts.slice(0, i + 1).join("/"))
-                }
-                className="hover:underline"
-                style={{
-                  color:
-                    i === pathParts.length - 1
-                      ? "var(--text-primary)"
-                      : "var(--accent)",
-                }}
-              >
-                {part}
-              </button>
-            </span>
-          ))}
+          <div
+            className="flex-1 min-w-0 flex items-center gap-0.5 text-xs px-2 py-1.5 rounded overflow-x-auto"
+            style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}
+          >
+            <button
+              onClick={() => setCurrentPath("/")}
+              className="hover:underline shrink-0"
+              style={{ color: "var(--accent)" }}
+            >
+              /
+            </button>
+            {pathParts.map((part, i) => (
+              <span key={i} className="flex items-center gap-0.5 shrink-0">
+                {i > 0 && <span style={{ color: "var(--text-secondary)" }}>/</span>}
+                <button
+                  onClick={() =>
+                    setCurrentPath("/" + pathParts.slice(0, i + 1).join("/"))
+                  }
+                  className="hover:underline"
+                  style={{
+                    color:
+                      i === pathParts.length - 1
+                        ? "var(--text-primary)"
+                        : "var(--accent)",
+                  }}
+                >
+                  {part}
+                </button>
+              </span>
+            ))}
+          </div>
         </div>
 
         <div
@@ -146,7 +164,16 @@ export function DirectoryBrowser({
                 </div>
               )}
 
-              {dirs.length === 0 && !loading && (
+              {!readable && (
+                <div
+                  className="px-3 py-2"
+                  style={{ color: "var(--text-secondary)", borderBottom: "1px solid var(--border)" }}
+                >
+                  {t("directory.unreadable")}
+                </div>
+              )}
+
+              {readable && dirs.length === 0 && (
                 <div
                   className="px-3 py-4 text-center"
                   style={{ color: "var(--text-secondary)" }}

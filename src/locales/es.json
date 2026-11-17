@@ -456,6 +456,8 @@
 
   "directory.title": "Seleccionar directorio",
   "directory.noSubdirs": "Sin subdirectorios",
+  "directory.home": "Carpeta personal",
+  "directory.unreadable": "No se puede listar esta carpeta",
 
   "properties.title": "Propiedades",
   "properties.uploadSlots": "Slots de subida",

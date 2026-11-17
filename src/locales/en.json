@@ -456,6 +456,8 @@
 
   "directory.title": "Select Directory",
   "directory.noSubdirs": "No subdirectories",
+  "directory.home": "Home folder",
+  "directory.unreadable": "Can't list this folder",
 
   "properties.title": "Properties",
   "properties.uploadSlots": "Upload Slots",

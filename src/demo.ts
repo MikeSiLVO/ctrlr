@@ -679,7 +679,7 @@ export const demoAddTorrents: {
 /** Subdirectories for the directory browser, under the path as given. */
 export function remoteDirectory(path: string): RemoteDirectory {
   const top = path.endsWith("/downloads") || path === "";
-  return { path, dirs: top ? ["complete", "incomplete", "tv", "movies"] : [] };
+  return { path, dirs: top ? ["complete", "incomplete", "tv", "movies"] : [], readable: true };
 }
 
 /** Per-torrent tunables for the properties dialog. */

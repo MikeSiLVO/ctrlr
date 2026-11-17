@@ -20,6 +20,14 @@ fn quote_arg(value: &str) -> String {
 pub struct RemoteDirectory {
     pub path: String,
     pub dirs: Vec<String>,
+    /// False when the server may enter the folder but not list it, as with /home on shared hosts.
+    pub readable: bool,
+}
+
+/// The next folder from a path toward home, when home lies below it.
+fn home_step(path: &str, home: &str) -> Option<String> {
+    let below = if path == "/" { home.strip_prefix('/') } else { home.strip_prefix(path)?.strip_prefix('/') };
+    below?.split('/').next().filter(|s| !s.is_empty()).map(str::to_string)
 }
 
 /// Paths to delete: the files, then folders deepest first, the root only if named for the torrent.
@@ -833,10 +841,11 @@ impl RtorrentClient {
         output.parse::<i64>().map_err(|_| RpcError::Protocol(format!("Failed to parse quota output: {}", output)))
     }
 
-    /// List the subdirectory names of a path on the rTorrent host, with the path made absolute.
+    /// List a remote path's subdirectories, made absolute, or only the way home if unreadable.
     pub async fn list_directory(&self, path: &str) -> Result<RemoteDirectory, RpcError> {
         // -L lists a linked folder as a folder; a dangling link must not fail the whole listing
-        let script = r#"cd -- "$1" || exit 1; pwd; ls -1apL . 2>/dev/null; exit 0"#;
+        let script = r#"cd -- "$1" || exit 1; pwd; printf '%s\n' "$HOME"
+            if [ -r . ]; then echo r; ls -1apL . 2>/dev/null; else echo n; fi; exit 0"#;
         let result = self.call(
             "execute.capture",
             vec![json!(""), json!("sh"), json!("-c"), json!(script), json!("sh"), json!(path)],
@@ -844,13 +853,19 @@ impl RtorrentClient {
 
         let mut lines = result.as_str().unwrap_or("").lines();
         let resolved = lines.next().unwrap_or(path).to_string();
-        let dirs = lines
+        let home = lines.next().unwrap_or("");
+        let readable = lines.next() == Some("r");
+        let mut dirs: Vec<String> = lines
             .filter(|line| line.ends_with('/'))
             .filter(|line| *line != "./" && *line != "../")
             .map(|line| line.trim_end_matches('/').to_string())
             .collect();
+        // a folder that can't be listed still shows the way home
+        if !readable && let Some(step) = home_step(&resolved, home) {
+            dirs.push(step);
+        }
 
-        Ok(RemoteDirectory { path: resolved, dirs })
+        Ok(RemoteDirectory { path: resolved, dirs, readable })
     }
 
     /// Call every method on every hash in one batch, in method order per hash.
@@ -1054,6 +1069,17 @@ impl RtorrentClient {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Step toward home one folder at a time from each of its ancestors, and from nowhere else.
+    #[test]
+    fn steps_toward_home() {
+        assert_eq!(home_step("/", "/home/me").as_deref(), Some("home"));
+        assert_eq!(home_step("/home", "/home/me").as_deref(), Some("me"));
+        assert_eq!(home_step("/home/me", "/home/me"), None);
+        assert_eq!(home_step("/ho", "/home/me"), None);
+        assert_eq!(home_step("/mnt", "/home/me"), None);
+        assert_eq!(home_step("/home", ""), None);
+    }
 
     /// Plan a single file as itself with no folders to remove.
     #[test]
