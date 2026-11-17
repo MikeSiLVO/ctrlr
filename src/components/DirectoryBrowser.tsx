@@ -7,7 +7,8 @@ import * as api from "../api";
 /** Props for the remote directory picker. */
 interface DirectoryBrowserProps {
   initialPath?: string;
-  onSelect: (path: string) => void;
+  /** May return a promise; Select waits on it and a rejection shows in the picker. */
+  onSelect: (path: string) => void | Promise<void>;
   onCancel: () => void;
 }
 
@@ -23,6 +24,20 @@ export function DirectoryBrowser({
   const [readable, setReadable] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selecting, setSelecting] = useState(false);
+  const [selectError, setSelectError] = useState<string | null>(null);
+
+  async function handleSelect() {
+    setSelecting(true);
+    setSelectError(null);
+    try {
+      await onSelect(currentPath);
+    } catch (e) {
+      setSelectError(String(e));
+    } finally {
+      setSelecting(false);
+    }
+  }
 
   useEffect(() => {
     if (!initialPath) {
@@ -203,6 +218,12 @@ export function DirectoryBrowser({
           )}
         </div>
 
+        {selectError && (
+          <div className="mt-3 text-xs" style={{ color: "var(--danger)" }}>
+            {selectError}
+          </div>
+        )}
+
         <div className="flex items-center justify-between mt-3">
           <span
             className="text-xs truncate mr-4"
@@ -222,8 +243,9 @@ export function DirectoryBrowser({
               {t("common.cancel")}
             </button>
             <button
-              onClick={() => onSelect(currentPath)}
-              className="px-3 py-1.5 rounded text-xs font-medium"
+              onClick={handleSelect}
+              disabled={selecting}
+              className="px-3 py-1.5 rounded text-xs font-medium disabled:opacity-40"
               style={{
                 background: "var(--accent-dim)",
                 color: "white",

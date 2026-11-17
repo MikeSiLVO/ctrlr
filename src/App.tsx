@@ -782,8 +782,8 @@ export default function App() {
 
       {moveHashes && (
         <DirectoryBrowser
-          onSelect={(dir) => {
-            handleAction(() => api.moveTorrents(moveHashes, dir));
+          onSelect={async (dir) => {
+            await api.moveTorrents(moveHashes, dir);
             setMoveHashes(null);
           }}
           onCancel={() => setMoveHashes(null)}
