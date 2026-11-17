@@ -572,9 +572,9 @@ export async function rssGetHistory(limit: number): Promise<RssDownloadRecord[]>
   return invoke("rss_get_history", { limit });
 }
 
-/** Clear auto-download history for one rule or for all, resetting GUID and episode dedup. */
-export async function rssClearHistory(rule?: string): Promise<void> {
-  return invoke("rss_clear_history", { rule: rule ?? null });
+/** Clear auto-download history for every rule, resetting GUID and episode dedup. */
+export async function rssClearHistory(): Promise<void> {
+  return invoke("rss_clear_history");
 }
 
 /** Set background polling on or off, saving it to rss.toml. */

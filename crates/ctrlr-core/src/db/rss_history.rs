@@ -89,12 +89,4 @@ impl Database {
             .map_err(|e| format!("failed to clear: {e}"))?;
         Ok(())
     }
-
-    /// Clear the RSS download records of one rule.
-    pub fn rss_clear_rule(&self, rule: &str) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
-        conn.execute("DELETE FROM rss_downloads WHERE rule = ?1", params![rule])
-            .map_err(|e| format!("failed to clear rule: {e}"))?;
-        Ok(())
-    }
 }

@@ -345,16 +345,13 @@ impl RssManager {
     }
 
     /// Get the most recent download records, newest first.
-    pub fn get_history(&self, limit: usize) -> Vec<DownloadRecord> {
+    pub fn get_history(&self, limit: usize) -> Result<Vec<DownloadRecord>, String> {
         self.history.recent(limit)
     }
 
-    /// Clear download history for one rule, or for every rule.
-    pub fn clear_history(&self, rule: Option<&str>) {
-        match rule {
-            Some(r) => self.history.clear_rule(r),
-            None => self.history.clear(),
-        }
+    /// Clear download history for every rule.
+    pub fn clear_history(&self) -> Result<(), String> {
+        self.history.clear()
     }
 
     /// Set the enabled flag and write rss.toml, without starting or stopping the loop.
@@ -585,17 +582,13 @@ pub async fn rss_get_history(
     state: State<'_, AppState>,
     limit: usize,
 ) -> Result<Vec<ctrlr_core::rss::DownloadRecord>, String> {
-    Ok(state.rss_manager.get_history(limit))
+    state.rss_manager.get_history(limit)
 }
 
-/// Clear auto-download history for one rule or every rule, resetting GUID and episode dedup.
+/// Clear auto-download history for every rule, resetting GUID and episode dedup.
 #[tauri::command]
-pub async fn rss_clear_history(
-    state: State<'_, AppState>,
-    rule: Option<String>,
-) -> Result<(), String> {
-    state.rss_manager.clear_history(rule.as_deref());
-    Ok(())
+pub async fn rss_clear_history(state: State<'_, AppState>) -> Result<(), String> {
+    state.rss_manager.clear_history()
 }
 
 /// Set background polling on or off, saving it to rss.toml and starting or stopping the loop.

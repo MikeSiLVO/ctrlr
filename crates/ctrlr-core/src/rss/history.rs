@@ -18,7 +18,7 @@ pub struct DownloadRecord {
     pub episode: u32,
 }
 
-/// RSS download history over the SQLite database; every method swallows database errors.
+/// RSS download history over the SQLite database; adds and the matcher's lookups swallow errors.
 pub struct DownloadHistory {
     db: Arc<Database>,
 }
@@ -50,17 +50,12 @@ impl DownloadHistory {
     }
 
     /// Most recent downloads, newest first.
-    pub fn recent(&self, limit: usize) -> Vec<DownloadRecord> {
-        self.db.rss_recent(limit as i64).unwrap_or_default()
+    pub fn recent(&self, limit: usize) -> Result<Vec<DownloadRecord>, String> {
+        self.db.rss_recent(limit as i64)
     }
 
     /// Clear the download history of every rule.
-    pub fn clear(&self) {
-        self.db.rss_clear().ok();
-    }
-
-    /// Clear the download history of one rule.
-    pub fn clear_rule(&self, rule: &str) {
-        self.db.rss_clear_rule(rule).ok();
+    pub fn clear(&self) -> Result<(), String> {
+        self.db.rss_clear()
     }
 }
