@@ -5,7 +5,7 @@ use std::sync::Arc;
 use tauri::{Emitter, State};
 
 use ctrlr_core::RtorrentClient;
-use ctrlr_core::Torrent;
+use ctrlr_core::{Torrent, TorrentMeta};
 use ctrlr_core::db::Database;
 use ctrlr_core::db::history::NewTorrentHistory;
 
@@ -22,9 +22,30 @@ pub(crate) struct HistorySync {
 }
 
 /// Record an added torrent, logging rather than failing the add if it cannot.
-pub(crate) fn record_history(db: &Database, log: &ActivityLog, entry: &NewTorrentHistory<'_>) {
+fn record_history(db: &Database, log: &ActivityLog, entry: &NewTorrentHistory<'_>) {
     if let Err(e) = db.add_torrent_history(entry) {
         log.warn("torrent", format!("Could not record torrent history: {e}"));
+    }
+}
+
+/// Record an added .torrent with its parsed metadata, archiving its bytes.
+pub(crate) fn record_file_add(
+    db: &Database, log: &ActivityLog, meta: &TorrentMeta, data: &[u8], source: &str, directory: &str,
+) {
+    record_history(db, log, &NewTorrentHistory {
+        info_hash: &meta.info_hash, name: &meta.name, total_size: meta.total_size, directory, source,
+        added_at: unix_now(), torrent_blob: Some(data), ..Default::default()
+    });
+}
+
+/// Record an added magnet under its info hash, skipped when it has none.
+pub(crate) fn record_magnet_add(
+    db: &Database, log: &ActivityLog, uri: &str, name: &str, source: &str, directory: &str,
+) {
+    if let Some(hash) = ctrlr_core::meta::parse_magnet_hash(uri) {
+        record_history(db, log, &NewTorrentHistory {
+            info_hash: &hash, name, directory, source, added_at: unix_now(), ..Default::default()
+        });
     }
 }
 

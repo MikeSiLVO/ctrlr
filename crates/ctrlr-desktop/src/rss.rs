@@ -9,7 +9,6 @@ use tauri::{Emitter, State};
 use tokio::sync::Mutex;
 
 use ctrlr_core::db::Database;
-use ctrlr_core::db::history::NewTorrentHistory;
 use ctrlr_core::rss::config::{RssConfig, RssFeed, RssRule};
 use ctrlr_core::rss::history::{DownloadHistory, DownloadRecord};
 use ctrlr_core::rss::matcher;
@@ -17,7 +16,7 @@ use ctrlr_core::RtorrentClient;
 
 use crate::AppState;
 use crate::background::BackgroundLoop;
-use crate::history::record_history;
+use crate::history::{record_file_add, record_magnet_add};
 use crate::log::ActivityLog;
 
 /// One entry parsed from a feed.
@@ -154,22 +153,16 @@ impl RssManager {
                                         None => continue,
                                     };
 
-                                    let mut torrent_data: Option<Vec<u8>> = None;
                                     let added = if item.link.starts_with("magnet:") {
+                                        let hash = ctrlr_core::meta::parse_magnet_hash(&item.link)
+                                            .unwrap_or_default();
                                         rpc.add_torrent_with_options(
                                             &item.link, Some(&rule.directory),
                                             Some(&rule.label), Some(&rule.throttle),
-                                        ).await
+                                        ).await.map(|()| (hash, None))
                                     } else {
-                                        match fetch_bytes(&item.link, &feed.cookie).await {
-                                            Ok(data) => {
-                                                let result = rpc.add_torrent_file_with_options(
-                                                    &data, Some(&rule.directory),
-                                                    Some(&rule.label), Some(&rule.throttle),
-                                                ).await;
-                                                torrent_data = Some(data);
-                                                result
-                                            }
+                                        let data = match fetch_bytes(&item.link, &feed.cookie).await {
+                                            Ok(data) => data,
                                             Err(e) => {
                                                 activity_log.error(
                                                     "rss",
@@ -177,11 +170,26 @@ impl RssManager {
                                                 );
                                                 continue;
                                             }
-                                        }
+                                        };
+                                        // rTorrent accepts any bytes and fails later, unseen
+                                        let meta = match ctrlr_core::meta::parse(&data) {
+                                            Ok(meta) => meta,
+                                            Err(e) => {
+                                                activity_log.error(
+                                                    "rss",
+                                                    format!("Download for '{}' is not a .torrent: {e}", item.title),
+                                                );
+                                                continue;
+                                            }
+                                        };
+                                        rpc.add_torrent_file_with_options(
+                                            &data, Some(&rule.directory),
+                                            Some(&rule.label), Some(&rule.throttle),
+                                        ).await.map(|()| (meta.info_hash.to_uppercase(), Some((meta, data))))
                                     };
 
                                     match added {
-                                        Ok(()) => {
+                                        Ok((hash, file)) => {
                                             activity_log.info(
                                                 "rss",
                                                 format!(
@@ -190,37 +198,28 @@ impl RssManager {
                                                 ),
                                             );
 
-                                            let now_ts = crate::unix_now();
                                             let ep = m.episode_info.as_ref();
                                             // before any await; an abort must still record it
                                             history.add(DownloadRecord {
-                                                timestamp: now_ts,
+                                                timestamp: crate::unix_now(),
                                                 feed: feed_name.clone(),
                                                 rule: rule.name.clone(),
                                                 guid: item.guid.clone(),
                                                 title: item.title.clone(),
-                                                hash: String::new(),
+                                                hash,
                                                 season: ep.map_or(0, |e| e.season),
                                                 episode: ep.map_or(0, |e| e.episode),
                                             });
 
-                                            if let Some(ref data) = torrent_data {
-                                                if let Ok(meta) = ctrlr_core::meta::parse(data) {
-                                                    record_history(&db, &activity_log, &NewTorrentHistory {
-                                                        info_hash: &meta.info_hash, name: &meta.name,
-                                                        total_size: meta.total_size, directory: &rule.directory,
-                                                        source: "rss", added_at: now_ts, torrent_blob: Some(data),
-                                                        ..Default::default()
-                                                    });
-                                                }
-                                            } else if item.link.starts_with("magnet:")
-                                                && let Some(hash) = ctrlr_core::meta::parse_magnet_hash(&item.link) {
-                                                    record_history(&db, &activity_log, &NewTorrentHistory {
-                                                        info_hash: &hash, name: &item.title,
-                                                        directory: &rule.directory, source: "rss",
-                                                        added_at: now_ts, ..Default::default()
-                                                    });
-                                                }
+                                            match file {
+                                                Some((meta, data)) => record_file_add(
+                                                    &db, &activity_log, &meta, &data, "rss", &rule.directory,
+                                                ),
+                                                None => record_magnet_add(
+                                                    &db, &activity_log, &item.link, &item.title, "rss",
+                                                    &rule.directory,
+                                                ),
+                                            }
 
                                             let handle = app_handle.lock().await;
                                             if let Some(ref h) = *handle {
@@ -263,7 +262,7 @@ impl RssManager {
         cfg.feeds.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
     }
 
-    /// Save a feed under its key and write rss.toml; a rename refuses a taken key and updates rules.
+    /// Save a feed by key and write rss.toml; a rename refuses a taken key and updates rules.
     pub async fn save_feed(
         &self, key: String, feed: RssFeed, previous_key: Option<&str>,
     ) -> Result<(), String> {
@@ -406,16 +405,14 @@ async fn fetch_feed(url: &str, cookie: &str) -> Result<Vec<FeedItem>, String> {
             let title = entry.title.map_or_else(String::new, |t| t.content);
             let guid = entry
                 .id;
-            let link = entry
-                .links
-                .first()
-                .map(|l| l.href.clone())
+            // the enclosure is the download; <link> is often a details page
+            let link = entry.media.iter()
+                .flat_map(|m| &m.content)
+                .find_map(|c| c.url.as_ref().map(|u| u.to_string()))
                 .or_else(|| {
-                    // some feeds put the download link in an enclosure
-                    entry.media.first().and_then(|m| {
-                        m.content.first().and_then(|c| c.url.as_ref().map(|u| u.to_string()))
-                    })
+                    entry.links.iter().find(|l| l.rel.as_deref() == Some("enclosure")).map(|l| l.href.clone())
                 })
+                .or_else(|| entry.links.first().map(|l| l.href.clone()))
                 .unwrap_or_default();
             let published = entry.published.or(entry.updated).map(|dt| dt.timestamp());
 

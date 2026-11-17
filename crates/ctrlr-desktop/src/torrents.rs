@@ -5,9 +5,8 @@ use serde_json::json;
 use tauri::State;
 
 use ctrlr_core::{ServerCapabilities, Torrent, TorrentDetails, TorrentMeta, TorrentProperties};
-use ctrlr_core::db::history::NewTorrentHistory;
 
-use crate::history::{archive_blob, record_history, sync_history};
+use crate::history::{archive_blob, record_file_add, record_magnet_add, sync_history};
 use crate::{AppState, unix_now};
 
 /// List every torrent in the main view, syncing History; a fetching magnet takes its History name.
@@ -32,13 +31,11 @@ pub async fn add_torrent(state: State<'_, AppState>, source: String, directory: 
     client.add_torrent_with_options(&source, directory.as_deref(), None, None).await.map_err(|e| e.to_string())?;
 
     // magnet has no blob yet, the pending-blob loop fetches it later
-    if source.starts_with("magnet:")
-        && let Some(hash) = ctrlr_core::meta::parse_magnet_hash(&source) {
-            let name = ctrlr_core::meta::parse_magnet_dn(&source).unwrap_or_default();
-            record_history(&state.db, &state.activity_log, &NewTorrentHistory {
-                info_hash: &hash, name: &name, source: "magnet", added_at: unix_now(), ..Default::default()
-            });
-        }
+    if source.starts_with("magnet:") {
+        let name = ctrlr_core::meta::parse_magnet_dn(&source).unwrap_or_default();
+        let dir = directory.as_deref().unwrap_or("");
+        record_magnet_add(&state.db, &state.activity_log, &source, &name, "magnet", dir);
+    }
 
     state.activity_log.info("torrent", "Torrent added");
     Ok(())
@@ -51,10 +48,7 @@ pub async fn add_torrent_file(state: State<'_, AppState>, data: Vec<u8>) -> Resu
     client.add_torrent_file_with_options(&data, None, None, None).await.map_err(|e| e.to_string())?;
 
     if let Ok(meta) = ctrlr_core::meta::parse(&data) {
-        record_history(&state.db, &state.activity_log, &NewTorrentHistory {
-            info_hash: &meta.info_hash, name: &meta.name, total_size: meta.total_size,
-            source: "file", added_at: unix_now(), torrent_blob: Some(&data), ..Default::default()
-        });
+        record_file_add(&state.db, &state.activity_log, &meta, &data, "file", "");
     }
 
     state.activity_log.info("torrent", "Torrent added");
@@ -124,11 +118,7 @@ pub async fn add_torrent_configured(
 
     if let Ok(meta) = ctrlr_core::meta::parse(&data) {
         let dir = directory.as_deref().unwrap_or("");
-        record_history(&state.db, &state.activity_log, &NewTorrentHistory {
-            info_hash: &meta.info_hash, name: &meta.name, total_size: meta.total_size,
-            directory: dir, source: "file", added_at: unix_now(), torrent_blob: Some(&data),
-            ..Default::default()
-        });
+        record_file_add(&state.db, &state.activity_log, &meta, &data, "file", dir);
     }
 
     state.activity_log.info("torrent", "Torrent added");
