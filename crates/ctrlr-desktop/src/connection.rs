@@ -27,6 +27,48 @@ pub(crate) const LAUNCH_RETRY_FIRST: std::time::Duration = std::time::Duration::
 /// Longest wait between launch retries.
 const LAUNCH_RETRY_MAX: std::time::Duration = std::time::Duration::from_secs(60);
 
+/// Wait after a failed capability detection before the next try.
+const CAPABILITIES_RETRY: std::time::Duration = std::time::Duration::from_secs(60);
+
+/// Capabilities detected for the live client, and when detection last failed.
+#[derive(Default)]
+pub(crate) struct Capabilities {
+    detected: Option<Arc<ServerCapabilities>>,
+    failed_at: Option<std::time::Instant>,
+}
+
+/// The live client's capabilities, detected on first use and again a minute after a failure.
+pub(crate) async fn capabilities(
+    state: &AppState, client: &Arc<RtorrentClient>,
+) -> Option<Arc<ServerCapabilities>> {
+    let mut caps = state.capabilities.lock().await;
+    if let Some(detected) = &caps.detected {
+        return Some(detected.clone());
+    }
+    if caps.failed_at.is_some_and(|t| t.elapsed() < CAPABILITIES_RETRY) {
+        return None;
+    }
+    let result = client.list_methods().await;
+    // a client a connect has replaced must not record anything for the new one
+    let live = state.client.lock().await.as_ref().is_some_and(|c| Arc::ptr_eq(c, client));
+    match result {
+        Ok(methods) => {
+            let detected = Arc::new(ServerCapabilities::from_methods(&methods));
+            if live {
+                caps.detected = Some(detected.clone());
+            }
+            Some(detected)
+        }
+        Err(e) => {
+            if live {
+                caps.failed_at = Some(std::time::Instant::now());
+                state.activity_log.warn("connection", format!("Could not detect server capabilities: {e}"));
+            }
+            None
+        }
+    }
+}
+
 /// Flat struct for frontend <-> backend connection settings.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ConnectionSettings {
@@ -151,7 +193,7 @@ async fn teardown_connection(state: &AppState) -> Option<String> {
         t.close().await.ok();
     }
     *tun = None;
-    *state.capabilities.lock().await = None;
+    *state.capabilities.lock().await = Capabilities::default();
     *state.history_sync.lock().await = HistorySync::default();
     state.active_profile.lock().await.take()
 }
@@ -189,7 +231,7 @@ async fn connect_and_store(
     Ok(())
 }
 
-/// Store a client as the live connection, detecting its capabilities and resetting the scheduler.
+/// Store a client as the live connection, resetting the scheduler; capabilities wait for first use.
 async fn store_connection(
     state: &AppState,
     name: &str,
@@ -197,18 +239,10 @@ async fn store_connection(
     client: RtorrentClient,
     tunnel: Option<Arc<SshTunnel>>,
 ) {
-    let caps = match client.list_methods().await {
-        Ok(methods) => Some(ServerCapabilities::from_methods(&methods)),
-        Err(e) => {
-            state.activity_log.warn("connection", format!("Could not detect server capabilities: {}", e));
-            None
-        }
-    };
-
     *state.client.lock().await = Some(Arc::new(client));
     *state.tunnel.lock().await = tunnel;
     *state.active_profile.lock().await = Some(name.to_string());
-    *state.capabilities.lock().await = caps;
+    *state.capabilities.lock().await = Capabilities::default();
     state.scheduler.reset().await;
     state.activity_log.info("connection", format!("Connected to '{name}' ({})", conn_desc(conn)));
 }
@@ -305,7 +339,8 @@ pub async fn disconnect(state: State<'_, AppState>) -> Result<(), String> {
 /// Which optional rTorrent commands this server exposes, from system.listMethods.
 #[tauri::command]
 pub async fn get_capabilities(state: State<'_, AppState>) -> Result<Option<ServerCapabilities>, String> {
-    Ok(state.capabilities.lock().await.clone())
+    let client = get_client!(state);
+    Ok(capabilities(&state, &client).await.as_deref().cloned())
 }
 
 /// Profile name and connection type for the profile list.

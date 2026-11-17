@@ -6,6 +6,7 @@ use tauri::State;
 
 use ctrlr_core::{ServerCapabilities, Torrent, TorrentDetails, TorrentMeta, TorrentProperties};
 
+use crate::connection::capabilities;
 use crate::history::{archive_blob, record_file_add, record_magnet_add, sync_history};
 use crate::{AppState, unix_now};
 
@@ -13,8 +14,8 @@ use crate::{AppState, unix_now};
 #[tauri::command]
 pub async fn list_torrents(app: tauri::AppHandle, state: State<'_, AppState>) -> Result<Vec<Torrent>, String> {
     let client = get_client!(state);
-    let caps = state.capabilities.lock().await.clone();
-    let mut torrents = client.list_torrents(caps.as_ref()).await.map_err(|e| e.to_string())?;
+    let caps = capabilities(&state, &client).await;
+    let mut torrents = client.list_torrents(caps.as_deref()).await.map_err(|e| e.to_string())?;
     sync_history(&app, &state, &client, &torrents).await;
     for t in torrents.iter_mut().filter(|t| t.fetching_metadata) {
         if let Ok(Some(name)) = state.db.live_entry_name(&t.hash) {
@@ -88,31 +89,30 @@ pub async fn add_torrent_configured(
         .await
         .map_err(|e| e.to_string())?;
 
-    if !extra_trackers.is_empty() {
-        let caps = state.capabilities.lock().await.clone();
-        if caps.as_ref().is_some_and(|c| c.has_tracker_insert) {
-            let hash = info_hash.to_uppercase();
-            // unreadable flag counts as private; public trackers there risk a tracker ban
-            let is_private = client
-                .call("d.is_private", vec![json!(hash)])
-                .await
-                .ok()
-                .and_then(|v| v.as_i64())
-                .unwrap_or(1) != 0;
-            if !is_private {
-                let calls: Vec<(String, Vec<serde_json::Value>)> = extra_trackers
-                    .iter()
-                    .filter(|url| !url.trim().is_empty())
-                    .map(|url| (
-                        "d.tracker.insert".into(),
-                        vec![json!(hash), json!(0), json!(url.trim())],
-                    ))
-                    .collect();
-                if !calls.is_empty()
-                    && let Err(e) = client.call_batch(calls).await {
-                        state.activity_log.warn("torrent", format!("Could not add default trackers: {e}"));
-                    }
-            }
+    if !extra_trackers.is_empty()
+        && capabilities(&state, &client).await.is_some_and(|c| c.has_tracker_insert)
+    {
+        let hash = info_hash.to_uppercase();
+        // unreadable flag counts as private; public trackers there risk a tracker ban
+        let is_private = client
+            .call("d.is_private", vec![json!(hash)])
+            .await
+            .ok()
+            .and_then(|v| v.as_i64())
+            .unwrap_or(1) != 0;
+        if !is_private {
+            let calls: Vec<(String, Vec<serde_json::Value>)> = extra_trackers
+                .iter()
+                .filter(|url| !url.trim().is_empty())
+                .map(|url| (
+                    "d.tracker.insert".into(),
+                    vec![json!(hash), json!(0), json!(url.trim())],
+                ))
+                .collect();
+            if !calls.is_empty()
+                && let Err(e) = client.call_batch(calls).await {
+                    state.activity_log.warn("torrent", format!("Could not add default trackers: {e}"));
+                }
         }
     }
 
@@ -132,8 +132,8 @@ pub async fn get_torrent_details(
     hash: String,
 ) -> Result<TorrentDetails, String> {
     let client = get_client!(state);
-    let caps = state.capabilities.lock().await.clone()
-        .unwrap_or_else(|| ServerCapabilities::from_methods(&[]));
+    let caps = capabilities(&state, &client).await
+        .unwrap_or_else(|| std::sync::Arc::new(ServerCapabilities::from_methods(&[])));
     client
         .get_torrent_details(&hash, &caps)
         .await
@@ -151,7 +151,7 @@ pub async fn get_torrent_file(state: State<'_, AppState>, hash: String) -> Resul
 #[tauri::command]
 pub async fn get_torrent_properties(state: State<'_, AppState>, hash: String) -> Result<TorrentProperties, String> {
     let client = get_client!(state);
-    let caps = state.capabilities.lock().await.clone().unwrap_or_default();
+    let caps = capabilities(&state, &client).await.unwrap_or_default();
     client.get_torrent_properties(&hash, &caps).await.map_err(|e| e.to_string())
 }
 
@@ -159,7 +159,7 @@ pub async fn get_torrent_properties(state: State<'_, AppState>, hash: String) ->
 #[tauri::command]
 pub async fn set_torrent_properties(state: State<'_, AppState>, hash: String, props: TorrentProperties) -> Result<(), String> {
     let client = get_client!(state);
-    let caps = state.capabilities.lock().await.clone().unwrap_or_default();
+    let caps = capabilities(&state, &client).await.unwrap_or_default();
     client.set_torrent_properties(&hash, &props, &caps).await.map_err(|e| e.to_string())
 }
 

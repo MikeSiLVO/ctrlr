@@ -44,7 +44,7 @@ use tauri::menu::{MenuBuilder, MenuItemBuilder};
 use tauri::tray::TrayIconBuilder;
 use tokio::sync::Mutex;
 
-use ctrlr_core::{RtorrentClient, ServerCapabilities, SshTunnel};
+use ctrlr_core::{RtorrentClient, SshTunnel};
 use ctrlr_core::config::{self, Config};
 use ctrlr_core::db::Database;
 
@@ -63,7 +63,7 @@ struct AppState {
     /// Set once the frontend reads initial_open and can take open-torrent events.
     frontend_ready: std::sync::atomic::AtomicBool,
     active_profile: Arc<Mutex<Option<String>>>,
-    capabilities: Arc<Mutex<Option<ServerCapabilities>>>,
+    capabilities: Mutex<connection::Capabilities>,
     activity_log: Arc<ActivityLog>,
     db: Arc<Database>,
     rss_manager: Arc<rss::RssManager>,
@@ -245,12 +245,6 @@ async fn main() {
         Err(e) => (None, None, Some((is_unreachable(&*e), e.to_string()))),
     };
 
-    let capabilities = if let Some(ref c) = client {
-        c.list_methods().await.ok().map(|m| ServerCapabilities::from_methods(&m))
-    } else {
-        None
-    };
-
     let client_connected = client.is_some();
     let loaded_config = Config::load().ok();
     let active_profile = if client_connected {
@@ -314,7 +308,7 @@ async fn main() {
         initial_open: std::sync::Mutex::new(Vec::new()),
         frontend_ready: std::sync::atomic::AtomicBool::new(false),
         active_profile: Arc::new(Mutex::new(active_profile)),
-        capabilities: Arc::new(Mutex::new(capabilities)),
+        capabilities: Mutex::new(connection::Capabilities::default()),
         activity_log: activity_log.clone(),
         db: db.clone(),
         rss_manager: rss_manager.clone(),

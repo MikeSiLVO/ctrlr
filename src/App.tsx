@@ -296,6 +296,13 @@ export default function App() {
     api.listTorrents,
     connected ? pollInterval : 0,
   );
+  // the backend retries a failed detection itself; ask again until it has an answer
+  useEffect(() => {
+    if (connected && !capabilities && torrents) {
+      api.getCapabilities().then(setCapabilities).catch(() => {});
+    }
+  }, [connected, capabilities, torrents]);
+
   const { data: stats } = usePoll(api.getTransferStats, connected ? pollInterval : 0);
   const { data: limits, refresh: refreshLimits } = usePoll(api.getSpeedLimits, visible ? pollInterval * 2 : 0);
   const diskFetcher = diskProvider === "whatbox" ? api.getDiskUsed : api.getFreeDiskspace;

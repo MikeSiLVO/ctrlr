@@ -10,6 +10,7 @@ use ctrlr_core::config::{load_toml, save_toml};
 use ctrlr_core::{RtorrentClient, SystemInfo, TransferStats};
 
 use crate::AppState;
+use crate::connection::capabilities;
 
 /// Global up and down rates and totals.
 #[tauri::command]
@@ -110,7 +111,7 @@ pub struct RemoteSettings {
 #[tauri::command]
 pub async fn get_remote_settings(state: State<'_, AppState>) -> Result<RemoteSettings, String> {
     let client = get_client!(state);
-    let caps = state.capabilities.lock().await.clone();
+    let caps = capabilities(&state, &client).await;
 
     let mut calls: Vec<(String, Vec<serde_json::Value>)> = vec![
         ("directory.default".into(), vec![]),
