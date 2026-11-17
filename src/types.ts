@@ -286,6 +286,12 @@ export interface HistoryQuery {
   desc: boolean;
 }
 
+/** A directory on the rTorrent host, its path made absolute, and its subdirectory names. */
+export interface RemoteDirectory {
+  path: string;
+  dirs: string[];
+}
+
 /** One page of history, with counts of entries and archived .torrents matching the filters. */
 export interface TorrentHistoryPage {
   entries: TorrentHistoryEntry[];

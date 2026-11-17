@@ -17,6 +17,7 @@ import type {
   SchedulerActive,
   TorrentHistoryPage,
   HistoryQuery,
+  RemoteDirectory,
 } from "./types";
 
 /** Whether this is a demo build, set by VITE_DEMO at build time. */
@@ -306,8 +307,8 @@ export async function getDiskUsed(): Promise<number> {
   return invoke("get_disk_used");
 }
 
-/** Subdirectory names under a remote path, for the directory browser. */
-export async function listRemoteDirectory(path: string): Promise<string[]> {
+/** A remote path made absolute and its subdirectory names, for the directory browser. */
+export async function listRemoteDirectory(path: string): Promise<RemoteDirectory> {
   return invoke("list_remote_directory", { path });
 }
 
@@ -362,7 +363,7 @@ export async function saveRatioGroups(groups: RatioGroup[]): Promise<void> {
   return invoke("save_ratio_groups", { groups });
 }
 
-/** Re-apply this server's saved ratio groups after an rTorrent restart, returning the enabled ids. */
+/** Re-apply this server's saved ratio groups after an rTorrent restart; returns the enabled ids. */
 export async function restoreRatioGroups(): Promise<number[]> {
   return invoke("restore_ratio_groups");
 }

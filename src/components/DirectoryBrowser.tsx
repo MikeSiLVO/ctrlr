@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { DialogShell } from "./ui";
 import * as api from "../api";
@@ -33,13 +33,19 @@ export function DirectoryBrowser({
     }
   }, [initialPath]);
 
+  // the absolute path the server resolved last; switching to it needs no second listing
+  const resolvedRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!currentPath) return;
+    if (!currentPath || currentPath === resolvedRef.current) return;
     setLoading(true);
     setError(null);
     api
       .listRemoteDirectory(currentPath)
-      .then(setDirs)
+      .then((dir) => {
+        resolvedRef.current = dir.path;
+        setDirs(dir.dirs);
+        setCurrentPath(dir.path);
+      })
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false));
   }, [currentPath]);
@@ -84,7 +90,7 @@ export function DirectoryBrowser({
           </button>
           {pathParts.map((part, i) => (
             <span key={i} className="flex items-center gap-0.5 shrink-0">
-              <span style={{ color: "var(--text-secondary)" }}>/</span>
+              {i > 0 && <span style={{ color: "var(--text-secondary)" }}>/</span>}
               <button
                 onClick={() =>
                   setCurrentPath("/" + pathParts.slice(0, i + 1).join("/"))

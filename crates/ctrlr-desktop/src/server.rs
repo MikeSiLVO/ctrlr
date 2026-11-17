@@ -73,9 +73,11 @@ pub async fn get_disk_used(state: State<'_, AppState>) -> Result<i64, String> {
     client.get_disk_used().await.map_err(|e| e.to_string())
 }
 
-/// Subdirectory names under a remote path, for the directory browser.
+/// A remote path made absolute and its subdirectory names, for the directory browser.
 #[tauri::command]
-pub async fn list_remote_directory(state: State<'_, AppState>, path: String) -> Result<Vec<String>, String> {
+pub async fn list_remote_directory(
+    state: State<'_, AppState>, path: String,
+) -> Result<ctrlr_core::client::RemoteDirectory, String> {
     let client = get_client!(state);
     client.list_directory(&path).await.map_err(|e| e.to_string())
 }

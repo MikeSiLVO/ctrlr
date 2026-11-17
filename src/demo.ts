@@ -18,6 +18,7 @@ import type {
   HistoryQuery,
   HistorySort,
   SystemInfo,
+  RemoteDirectory,
 } from "./types";
 import type { ProfileList, RemoteSettings, RatioGroup, TorrentMeta } from "./api";
 
@@ -675,10 +676,10 @@ export const demoAddTorrents: {
   },
 ];
 
-/** Subdirectories for the directory browser. */
-export function remoteDirectory(path: string): string[] {
-  if (path.endsWith("/downloads") || path === "") return ["complete", "incomplete", "tv", "movies"];
-  return [];
+/** Subdirectories for the directory browser, under the path as given. */
+export function remoteDirectory(path: string): RemoteDirectory {
+  const top = path.endsWith("/downloads") || path === "";
+  return { path, dirs: top ? ["complete", "incomplete", "tv", "movies"] : [] };
 }
 
 /** Per-torrent tunables for the properties dialog. */

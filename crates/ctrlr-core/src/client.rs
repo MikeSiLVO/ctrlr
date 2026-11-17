@@ -15,6 +15,13 @@ fn quote_arg(value: &str) -> String {
     value.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
+/// A directory on the rTorrent host, its path made absolute, and its subdirectory names.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct RemoteDirectory {
+    pub path: String,
+    pub dirs: Vec<String>,
+}
+
 /// Paths to delete: the files, then folders deepest first, the root only if named for the torrent.
 fn deletion_plan(root: &str, multi_file: bool, name: &str, rel_paths: &[&str]) -> (Vec<String>, Vec<String>) {
     if !multi_file {
@@ -826,22 +833,24 @@ impl RtorrentClient {
         output.parse::<i64>().map_err(|_| RpcError::Protocol(format!("Failed to parse quota output: {}", output)))
     }
 
-    /// List the subdirectory names of a path on the rTorrent host.
-    pub async fn list_directory(&self, path: &str) -> Result<Vec<String>, RpcError> {
+    /// List the subdirectory names of a path on the rTorrent host, with the path made absolute.
+    pub async fn list_directory(&self, path: &str) -> Result<RemoteDirectory, RpcError> {
+        // -L lists a linked folder as a folder; a dangling link must not fail the whole listing
+        let script = r#"cd -- "$1" || exit 1; pwd; ls -1apL . 2>/dev/null; exit 0"#;
         let result = self.call(
             "execute.capture",
-            vec![json!(""), json!("ls"), json!("-1ap"), json!(path)],
+            vec![json!(""), json!("sh"), json!("-c"), json!(script), json!("sh"), json!(path)],
         ).await?;
 
-        let output = result.as_str().unwrap_or("");
-        let dirs: Vec<String> = output
-            .lines()
+        let mut lines = result.as_str().unwrap_or("").lines();
+        let resolved = lines.next().unwrap_or(path).to_string();
+        let dirs = lines
             .filter(|line| line.ends_with('/'))
             .filter(|line| *line != "./" && *line != "../")
             .map(|line| line.trim_end_matches('/').to_string())
             .collect();
 
-        Ok(dirs)
+        Ok(RemoteDirectory { path: resolved, dirs })
     }
 
     /// Call every method on every hash in one batch, in method order per hash.
