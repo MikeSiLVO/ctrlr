@@ -386,8 +386,8 @@ async fn fetch_bytes(url: &str, cookie: &str) -> Result<Vec<u8>, String> {
     if !cookie.is_empty() {
         req = req.header("Cookie", cookie);
     }
-    let resp = req.send().await.map_err(|e| format!("HTTP error: {e}"))?;
     // the url can carry a tracker passkey
+    let resp = req.send().await.map_err(|e| format!("HTTP error: {}", e.without_url()))?;
     let resp = resp.error_for_status().map_err(|e| format!("HTTP error: {}", e.without_url()))?;
     let bytes = resp.bytes().await.map_err(|e| format!("read error: {e}"))?;
     Ok(bytes.into())
