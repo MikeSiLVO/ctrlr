@@ -9,6 +9,7 @@ use ctrlr_core::{Torrent, TorrentMeta};
 use ctrlr_core::db::Database;
 use ctrlr_core::db::history::NewTorrentHistory;
 
+use crate::connection::capabilities;
 use crate::log::ActivityLog;
 use crate::{AppState, unix_now};
 
@@ -46,6 +47,19 @@ pub(crate) fn record_magnet_add(
         record_history(db, log, &NewTorrentHistory {
             info_hash: &hash, name, directory, source, added_at: unix_now(), ..Default::default()
         });
+    }
+}
+
+/// Archive the .torrent of each entry loaded on this server lacking one, if the server can send it.
+pub(crate) async fn archive_pending_blobs(state: &AppState, client: &Arc<RtorrentClient>) {
+    let caps = capabilities(state, client).await;
+    if !caps.is_some_and(|c| c.has_session_path && c.has_execute_capture) {
+        return;
+    }
+    let Some(loaded) = state.history_sync.lock().await.synced.clone() else { return };
+    let Ok(pending) = state.db.pending_blobs() else { return };
+    for hash in pending.iter().filter(|h| loaded.binary_search(h).is_ok()) {
+        archive_blob(&state.db, &state.activity_log, client, hash).await;
     }
 }
 

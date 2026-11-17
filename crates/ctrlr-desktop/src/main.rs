@@ -470,21 +470,13 @@ async fn main() {
             }
 
             {
-                let db = app.state::<AppState>().db.clone();
-                let client = app.state::<AppState>().client.clone();
-                let log = app.state::<AppState>().activity_log.clone();
+                let handle = app.handle().clone();
                 tauri::async_runtime::spawn(async move {
                     loop {
                         tokio::time::sleep(std::time::Duration::from_secs(60)).await;
-                        let rpc = client.lock().await.clone();
-                        let rpc = match rpc {
-                            Some(c) => c,
-                            None => continue,
-                        };
-                        let Ok(pending) = db.pending_blobs() else { continue };
-                        for hash in pending {
-                            history::archive_blob(&db, &log, &rpc, &hash).await;
-                        }
+                        let state = handle.state::<AppState>();
+                        let Some(rpc) = state.client.lock().await.clone() else { continue };
+                        history::archive_pending_blobs(&state, &rpc).await;
                     }
                 });
             }
