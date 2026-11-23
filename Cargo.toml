@@ -38,4 +38,4 @@ feed-rs = "3"
 regex = "1"
 semver = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
-rusqlite = { version = "0.41", features = ["bundled"] }
+rusqlite = { version = "0.43", features = ["bundled"] }
